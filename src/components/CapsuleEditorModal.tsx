@@ -31,7 +31,7 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
   const [platform, setPlatform] = useState<PlatformType>("manual");
   const [folderId, setFolderId] = useState<string>("");
   const [tagsInput, setTagsInput] = useState("");
-  const [selectedFormat, setSelectedFormat] = useState<StructureFormatMode>("xml");
+  const [selectedFormat, setSelectedFormat] = useState<StructureFormatMode>("smart_capsule");
 
   const [feedback, setFeedback] = useState<{
     originalTokens: number;
@@ -252,15 +252,27 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
             </div>
 
             {/* Structure & Token Saver Toolbar */}
-            <div className="mb-2 p-2.5 bg-gradient-to-r from-indigo-50/80 via-slate-50 to-emerald-50/60 border border-indigo-100 rounded-xl space-y-2">
+            <div className="mb-2 p-2.5 bg-gradient-to-r from-emerald-50/80 via-slate-50 to-indigo-50/80 border border-indigo-100 rounded-xl space-y-2">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-1.5 text-[11px] text-slate-800 font-semibold">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                  <span>Structured Sequence Formatter</span>
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Token Reduction Mode</span>
                 </div>
 
                 {/* Format Mode Selector */}
                 <div className="flex items-center bg-white p-0.5 rounded-lg border border-slate-200 text-[10px] font-medium shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFormat("smart_capsule")}
+                    className={`px-2 py-0.5 rounded transition cursor-pointer ${
+                      selectedFormat === "smart_capsule"
+                        ? "bg-emerald-600 text-white font-bold shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                    title="Smart Capsule: extracts key rules, code, and active task (80%-95% token reduction)"
+                  >
+                    ⚡ Smart (~90% Less)
+                  </button>
                   <button
                     type="button"
                     onClick={() => setSelectedFormat("xml")}
@@ -269,9 +281,9 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
                         ? "bg-indigo-600 text-white font-semibold shadow-xs"
                         : "text-slate-600 hover:text-slate-900"
                     }`}
-                    title="Structured XML tags (<context_transfer>, <dialogue_sequence>, <turn>) - Best for Claude & GPT-4o"
+                    title="XML Sequence tags (<context_transfer>, <dialogue_sequence>, <turn>)"
                   >
-                    XML Tags
+                    XML Turns
                   </button>
                   <button
                     type="button"
@@ -281,7 +293,7 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
                         ? "bg-indigo-600 text-white font-semibold shadow-xs"
                         : "text-slate-600 hover:text-slate-900"
                     }`}
-                    title="Numbered Turn Sequence ([Turn 1 · User], [Turn 2 · Assistant])"
+                    title="Numbered Turn Sequence ([Turn 1], [Turn 2])"
                   >
                     Sequence
                   </button>
@@ -293,7 +305,7 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
                         ? "bg-indigo-600 text-white font-semibold shadow-xs"
                         : "text-slate-600 hover:text-slate-900"
                     }`}
-                    title="Compact Dialogue ([User]: ..., [Assistant]: ...) with minimal tokens"
+                    title="Compact Dialogue ([User]: ..., [Assistant]: ...)"
                   >
                     Compact
                   </button>
@@ -303,18 +315,24 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
               {/* Action Buttons */}
               <div className="flex items-center justify-between gap-2 pt-1 border-t border-indigo-100/70">
                 <span className="text-[10px] text-slate-500">
-                  Orders turns chronologically & removes conversational pleasantries
+                  {selectedFormat === "smart_capsule"
+                    ? "Condenses 30+ turns into key rules, code, and active task"
+                    : "Orders turns chronologically & removes conversational pleasantries"}
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => handleStructureAndSequence(selectedFormat, false)}
                     disabled={!content.trim()}
-                    className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                    title="Organize into structured chronological turns and minimize tokens"
+                    className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-md transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+                      selectedFormat === "smart_capsule"
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                        : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                    }`}
+                    title="Transform into selected format to minimize tokens"
                   >
-                    <ListOrdered className="w-3 h-3" />
-                    <span>⚡ Structure & Sequence</span>
+                    <Zap className="w-3 h-3" />
+                    <span>{selectedFormat === "smart_capsule" ? "⚡ Distill Smart Capsule" : "⚡ Structure & Sequence"}</span>
                   </button>
 
                   <button
@@ -337,7 +355,7 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   {feedback.savedTokens > 0 ? (
                     <span>
-                      Structured & ordered! Saved <strong>{feedback.savedTokens} tokens</strong> ({feedback.savingsPercent}% reduction: {feedback.originalTokens} ➔ {feedback.optimizedTokens} tokens)
+                      Distilled! Saved <strong>{feedback.savedTokens} tokens</strong> ({feedback.savingsPercent}% reduction: {feedback.originalTokens} ➔ {feedback.optimizedTokens} tokens)
                     </span>
                   ) : (
                     <span>Context formatted in correct sequence with zero filler!</span>

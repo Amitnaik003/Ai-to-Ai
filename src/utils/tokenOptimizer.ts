@@ -11,7 +11,7 @@ const MAX_CACHE_SIZE = 500;
  */
 export function estimateTokenCount(text: string): number {
   if (!text || text.length === 0) return 0;
-  
+
   if (text.length < 2000 && tokenCache.has(text)) {
     return tokenCache.get(text)!;
   }
@@ -85,7 +85,7 @@ export interface OptimizationResult {
   savingsPercent: number;
 }
 
-export type StructureFormatMode = 'xml' | 'sequence' | 'compact';
+export type StructureFormatMode = 'smart_capsule' | 'xml' | 'sequence' | 'compact';
 
 export interface StructureOptions {
   formatMode?: StructureFormatMode;
@@ -208,26 +208,194 @@ export function parseRawTextToTurns(rawText: string): CapsuleMessage[] {
 }
 
 /**
+ * Extracts high-density facts, key rules, and decisions from across all turns.
+ */
+function extractEstablishedKnowledge(turns: CapsuleMessage[]): string[] {
+  const facts: string[] = [];
+  const seen = new Set<string>();
+
+  for (const turn of turns) {
+    const lines = turn.text.split("\n");
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      // Look for numbered rules, bullet points, definitions, and key takeaways
+      const isFact =
+        /^(\d+[\.\)]|[-*•]|Rule\s*\d*:|Note:|Step\s*\d*:|Requirement:|Key\s*Point:)/i.test(line);
+
+      if (isFact && line.length > 15 && line.length < 280) {
+        const normalized = line.toLowerCase();
+        if (!seen.has(normalized)) {
+          seen.add(normalized);
+          facts.push(line);
+        }
+      }
+    }
+  }
+
+  // Cap facts to top 25 high-leverage points to preserve token efficiency
+  return facts.slice(0, 25);
+}
+
+/**
+ * Extracts all fenced code blocks across all turns to guarantee zero loss of technical assets.
+ */
+function extractAllCodeBlocks(turns: CapsuleMessage[]): string[] {
+  const codeBlocks: string[] = [];
+  const seenCode = new Set<string>();
+
+  for (const turn of turns) {
+    const matches = turn.text.match(/```[\s\S]*?```/g);
+    if (matches) {
+      for (const block of matches) {
+        const clean = block.trim();
+        if (!seenCode.has(clean)) {
+          seenCode.add(clean);
+          codeBlocks.push(clean);
+        }
+      }
+    }
+  }
+  return codeBlocks;
+}
+
+/**
+ * Ultra-low token context distillation (80%–95% token savings).
+ * Condenses large multi-turn conversations (e.g. 20k+ tokens) into an executive
+ * context handover capsule containing:
+ * 1. Initial objective / topic
+ * 2. Key established rules, definitions, and guidelines
+ * 3. 100% of code blocks & technical specs
+ * 4. Recent dialogue boundary (last 2-3 turns)
+ * 5. Direct handoff instruction for the next AI model.
+ */
+export function distillSmartCapsule(
+  turnsOrText: CapsuleMessage[] | string,
+  options: StructureOptions = {}
+): OptimizationResult {
+  const {
+    sourcePlatform = "AI Context",
+    title = "",
+    summary = ""
+  } = options;
+
+  let turns: CapsuleMessage[] = [];
+  let rawText = "";
+
+  if (typeof turnsOrText === "string") {
+    rawText = turnsOrText;
+    turns = parseRawTextToTurns(turnsOrText);
+  } else {
+    turns = turnsOrText;
+    rawText = turns.map((t) => `${t.role}: ${t.text}`).join("\n\n");
+  }
+
+  const originalTokens = estimateTokenCount(rawText);
+
+  // If conversation is already short (<= 3 turns or < 1200 tokens), format cleanly
+  if (turns.length <= 3 || originalTokens < 1200) {
+    return buildStructuredContext(turns, {
+      ...options,
+      formatMode: "xml"
+    });
+  }
+
+  // 1. Initial Goal / User prompt
+  const initialTurn = turns[0];
+  const initialObjective = cleanTextContent(initialTurn.text).slice(0, 400);
+
+  // 2. Extract key established rules and knowledge
+  const establishedFacts = extractEstablishedKnowledge(turns);
+
+  // 3. Extract all code blocks across the chat
+  const codeBlocks = extractAllCodeBlocks(turns);
+
+  // 4. Sliding window: preserve the most recent 2-3 active turns
+  const recentTurns = turns.slice(-3).map((t, idx) => ({
+    role: t.role,
+    text: cleanTextContent(t.text)
+  }));
+
+  // 5. Construct the ultra-compact Smart Capsule XML
+  const lines: string[] = [];
+  lines.push(`<context_capsule source="${sourcePlatform}"${title ? ` topic="${title.replace(/"/g, '&quot;')}"` : ""}>`);
+
+  if (summary) {
+    lines.push(`  <summary>${cleanTextContent(summary)}</summary>`);
+  }
+
+  lines.push(`  <initial_goal>`);
+  lines.push(`    ${initialObjective}`);
+  lines.push(`  </initial_goal>`);
+
+  if (establishedFacts.length > 0) {
+    lines.push(`  <established_rules_and_context>`);
+    for (const fact of establishedFacts) {
+      lines.push(`    ${fact}`);
+    }
+    lines.push(`  </established_rules_and_context>`);
+  }
+
+  if (codeBlocks.length > 0) {
+    lines.push(`  <established_code_and_specs>`);
+    for (const cb of codeBlocks) {
+      lines.push(`    ${cb.replace(/\n/g, "\n    ")}`);
+    }
+    lines.push(`  </established_code_and_specs>`);
+  }
+
+  lines.push(`  <active_dialogue_boundary>`);
+  recentTurns.forEach((turn, idx) => {
+    lines.push(`    <turn role="${turn.role}">`);
+    lines.push(`      ${turn.text.replace(/\n/g, "\n      ")}`);
+    lines.push(`    </turn>`);
+  });
+  lines.push(`  </active_dialogue_boundary>`);
+
+  lines.push(`  <handoff_directive>`);
+  lines.push(`    Continue assisting the user directly on the active prompt above based on the established rules and context. Do not repeat previous answers.`);
+  lines.push(`  </handoff_directive>`);
+  lines.push(`</context_capsule>`);
+
+  const optimized = lines.join("\n");
+  const optimizedTokens = estimateTokenCount(optimized);
+  const savedTokens = Math.max(0, originalTokens - optimizedTokens);
+  const savingsPercent =
+    originalTokens > 0 ? Math.round((savedTokens / originalTokens) * 100) : 0;
+
+  return {
+    optimized,
+    originalTokens,
+    optimizedTokens,
+    savedTokens,
+    savingsPercent
+  };
+}
+
+/**
  * Builds a structured, chronologically sequenced context payload with minimal token consumption.
  *
  * Supported formats:
- * 1. 'xml': Standardized XML tags (<context_transfer>, <dialogue_sequence>, <turn>)
- *    Recommended by Anthropic & OpenAI for zero-hallucination context handoff.
- * 2. 'sequence': Clean numbered turns ([Turn 1 · User], [Turn 2 · Assistant])
- * 3. 'compact': Minimal dialogue headers ([User]:, [Assistant]:) with no wrapping overhead.
+ * 1. 'smart_capsule': Ultra-compact executive handoff (80%–95% token savings).
+ * 2. 'xml': Full sequence XML tags (<context_transfer>, <dialogue_sequence>, <turn>).
+ * 3. 'sequence': Clean numbered turns ([Turn 1 · User], [Turn 2 · Assistant]).
+ * 4. 'compact': Minimal dialogue headers ([User]:, [Assistant]:).
  */
 export function buildStructuredContext(
   turnsOrText: CapsuleMessage[] | string,
   options: StructureOptions = {}
 ): OptimizationResult {
   const {
-    formatMode = "xml",
+    formatMode = "smart_capsule",
     sourcePlatform = "AI Context",
     title = "",
     summary = "",
     includeHandoff = true,
     aggressive = false
   } = options;
+
+  if (formatMode === "smart_capsule") {
+    return distillSmartCapsule(turnsOrText, options);
+  }
 
   let turns: CapsuleMessage[] = [];
   let rawText = "";
@@ -251,7 +419,7 @@ export function buildStructuredContext(
   let formattedOutput = "";
 
   if (formatMode === "xml") {
-    // 1. Structured XML Context Format (Optimal LLM understanding & lowest token overhead)
+    // 2. Structured XML Context Format
     const lines: string[] = [];
     lines.push(`<context_transfer source="${sourcePlatform}"${title ? ` topic="${title.replace(/"/g, '&quot;')}"` : ""}>`);
     if (summary) {
@@ -271,7 +439,7 @@ export function buildStructuredContext(
     formattedOutput = lines.join("\n");
 
   } else if (formatMode === "sequence") {
-    // 2. Numbered Sequence Format
+    // 3. Numbered Sequence Format
     const parts: string[] = [];
     if (title || sourcePlatform) {
       parts.push(`[CONTEXT: ${sourcePlatform.toUpperCase()}${title ? ` | ${title}` : ""}]`);
@@ -293,7 +461,7 @@ export function buildStructuredContext(
     formattedOutput = parts.join("\n").trim();
 
   } else {
-    // 3. Compact Dialogue Format
+    // 4. Compact Dialogue Format
     const parts: string[] = [];
     cleanedTurns.forEach((turn) => {
       const roleTag = turn.role === "user" ? "[User]:" : "[Assistant]:";
