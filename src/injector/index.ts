@@ -1,45 +1,63 @@
 /**
- * Finds the active prompt input or rich-text editor on the page
+ * Finds the active prompt input or rich-text editor on the page.
+ * Supports Shadow DOM piercing for Web Components (Gemini) and nested frames.
  */
 export function findActivePromptInput(): HTMLElement | null {
-  // Ordered priority selectors for LLM chatboxes
-  const selectors = [
-    // ChatGPT
-    "#prompt-textarea",
-    "div[contenteditable='true'][data-placeholder]",
-    "div#prompt-textarea[contenteditable='true']",
-    
-    // Claude
-    "div.ProseMirror[contenteditable='true']",
-    "div[contenteditable='true'][aria-label*='Prompt']",
-    "div[contenteditable='true'][aria-label*='Claude']",
+  function searchRoot(root: Document | ShadowRoot): HTMLElement | null {
+    const selectors = [
+      // ChatGPT (Lexical & Textarea)
+      "#prompt-textarea",
+      "div#prompt-textarea[contenteditable='true']",
+      "div[data-placeholder][contenteditable='true']",
+      "div[contenteditable='true'][id='prompt-textarea']",
 
-    // Gemini
-    "rich-textarea div[contenteditable='true']",
-    "div.ql-editor[contenteditable='true']",
-    "div[contenteditable='true'][aria-label*='Gemini']",
-    "div[contenteditable='true'][aria-label*='prompt']",
+      // Claude (ProseMirror)
+      "div.ProseMirror[contenteditable='true']",
+      "div[contenteditable='true'][aria-label*='Claude']",
+      "div[contenteditable='true'][aria-label*='Prompt']",
 
-    // Gmail
-    "div[role='textbox'][aria-label*='Message Body']",
-    "div[role='textbox'][g_editable='true']",
+      // Gemini (Quill / Custom rich-textarea)
+      "rich-textarea div[contenteditable='true']",
+      "div.ql-editor[contenteditable='true']",
+      "div[contenteditable='true'][aria-label*='Gemini']",
+      "div[contenteditable='true'][aria-label*='prompt']",
 
-    // Generic fallback
-    "textarea[placeholder*='Message']",
-    "textarea[placeholder*='Ask']",
-    "textarea[placeholder*='prompt']",
-    "textarea",
-    "div[contenteditable='true']"
-  ];
+      // Gmail
+      "div[role='textbox'][aria-label*='Message Body']",
+      "div[role='textbox'][g_editable='true']",
 
-  for (const sel of selectors) {
-    const el = document.querySelector(sel) as HTMLElement;
-    if (el && el.offsetParent !== null) { // must be visible
-      return el;
+      // Generic LLM & Web App fallbacks
+      "textarea[placeholder*='Message']",
+      "textarea[placeholder*='Ask']",
+      "textarea[placeholder*='prompt']",
+      "textarea",
+      "div[contenteditable='true']"
+    ];
+
+    for (const sel of selectors) {
+      const el = root.querySelector(sel) as HTMLElement;
+      if (el && el.offsetParent !== null) {
+        return el;
+      }
     }
+
+    // Traverse shadow roots for Web Components (e.g. Gemini <rich-textarea>)
+    const shadowHosts = root.querySelectorAll("rich-textarea, chat-window, [data-shadow]");
+    for (const host of shadowHosts) {
+      if (host.shadowRoot) {
+        const found = searchRoot(host.shadowRoot);
+        if (found) return found;
+      }
+    }
+
+    return null;
   }
 
-  // Active element fallback if user already focused the input
+  // 1. Try search across document and shadow DOM
+  const found = searchRoot(document);
+  if (found) return found;
+
+  // 2. Active element fallback if user has already focused the input
   const active = document.activeElement as HTMLElement;
   if (
     active &&
@@ -54,40 +72,52 @@ export function findActivePromptInput(): HTMLElement | null {
 }
 
 /**
- * Robustly injects text into modern React/Vue/ProseMirror contenteditable or textarea inputs
+ * Robustly injects text into modern React, Vue, Lexical, and ProseMirror inputs.
+ * Bypasses synthetic event suppression and updates internal framework state.
  */
 export function injectTextIntoElement(target: HTMLElement, text: string): boolean {
   try {
     target.focus();
 
-    // Strategy 1: Modern Rich Text / ContentEditable (ProseMirror, Lexical, Quill)
+    // Strategy 1: Rich Text / ContentEditable (ChatGPT Lexical, Claude ProseMirror, Gemini Quill)
     if (target.isContentEditable || target.getAttribute("contenteditable") === "true") {
-      // Clear selection or select all if replacing, or place caret at end
       const selection = window.getSelection();
       const range = document.createRange();
       range.selectNodeContents(target);
-      range.collapse(false); // caret at end
+      range.collapse(false); // caret at end of current content
       selection?.removeAllRanges();
       selection?.addRange(range);
 
-      // execCommand 'insertText' triggers framework internal transaction loops
-      const inserted = document.execCommand("insertText", false, text);
+      let success = false;
+      try {
+        success = document.execCommand("insertText", false, text);
+      } catch {
+        success = false;
+      }
 
-      if (!inserted || !target.innerText.includes(text.slice(0, 15))) {
-        // Fallback: Dispatch synthetic BeforeInput & Input events
-        target.dispatchEvent(
-          new InputEvent("beforeinput", {
+      if (!success || !target.innerText.includes(text.slice(0, 10))) {
+        // Fallback: Dispatch synthetic BeforeInput
+        try {
+          const beforeInputEvent = new InputEvent("beforeinput", {
             bubbles: true,
             cancelable: true,
             inputType: "insertText",
             data: text
-          })
-        );
-        target.innerText = (target.innerText ? target.innerText + "\n" : "") + text;
-        target.dispatchEvent(new Event("input", { bubbles: true }));
+          });
+          target.dispatchEvent(beforeInputEvent);
+        } catch {}
+
+        // Append text node directly into range
+        const textNode = document.createTextNode(text);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.setEndAfter(textNode);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
       }
 
-      target.dispatchEvent(new Event("input", { bubbles: true }));
+      // Notify modern framework state trackers
+      target.dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
       target.dispatchEvent(new Event("change", { bubbles: true }));
       return true;
     }
@@ -97,7 +127,13 @@ export function injectTextIntoElement(target: HTMLElement, text: string): boolea
       const currentVal = target.value;
       const newVal = currentVal ? `${currentVal}\n\n${text}` : text;
 
-      // Bypass React state tracking via native prototype property descriptor
+      // Reset React 16-19 internal value tracker to guarantee onChange triggers
+      const tracker = (target as any)._valueTracker;
+      if (tracker) {
+        tracker.setValue("");
+      }
+
+      // Bypass prototype descriptor to update value attribute directly
       const proto = Object.getPrototypeOf(target);
       const nativeSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
 
@@ -107,7 +143,7 @@ export function injectTextIntoElement(target: HTMLElement, text: string): boolea
         target.value = newVal;
       }
 
-      // Trigger synthetic events to notify React/Vue listeners
+      // Dispatch input & change events
       target.dispatchEvent(new Event("input", { bubbles: true }));
       target.dispatchEvent(new Event("change", { bubbles: true }));
       target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: " " }));

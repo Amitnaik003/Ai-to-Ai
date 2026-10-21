@@ -13,7 +13,7 @@ const INITIAL_FOLDERS: Folder[] = [
   { id: "f-code", name: "Code Contexts", color: "#f59e0b", createdAt: new Date().toISOString() }
 ];
 
-// Universal Storage helper for Chrome Storage or fallback
+// Universal Storage helper for Chrome Storage with fallback
 async function safeGet<T>(key: string, defaultValue: T): Promise<T> {
   try {
     const val = await storage.get<T>(key);
@@ -78,7 +78,8 @@ export const CapsuleStore = {
         ...capsule,
         version: existing.version + 1,
         updatedAt: new Date().toISOString(),
-        history: [previousVersion, ...(existing.history || [])]
+        // Keep up to 15 revisions to prevent local storage bloat
+        history: [previousVersion, ...(existing.history || [])].slice(0, 15)
       };
 
       items[existingIndex] = updatedCapsule;
@@ -160,6 +161,8 @@ export const CapsuleStore = {
     if (index >= 0) {
       updated = [...folders];
       updated[index] = folder;
+      await safeSet(FOLDERS_KEY, updated);
+      return folder;
     } else {
       const newFolder: Folder = {
         ...folder,
@@ -167,9 +170,9 @@ export const CapsuleStore = {
         createdAt: new Date().toISOString()
       };
       updated = [...folders, newFolder];
+      await safeSet(FOLDERS_KEY, updated);
+      return newFolder;
     }
-    await safeSet(FOLDERS_KEY, updated);
-    return folder;
   },
 
   async deleteFolder(folderId: string): Promise<void> {

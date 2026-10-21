@@ -1,5 +1,9 @@
 import type { CapsuleMessage, PlatformType } from "../types";
 
+// High-speed token estimation cache to prevent redundant recalculation on re-renders
+const tokenCache = new Map<string, number>();
+const MAX_CACHE_SIZE = 500;
+
 /**
  * Fast and accurate token count estimation for modern LLMs (GPT-4o, Claude 3.5, Gemini 1.5).
  * Standard rule of thumb: ~4 characters or ~0.75 words per token in English,
@@ -7,6 +11,10 @@ import type { CapsuleMessage, PlatformType } from "../types";
  */
 export function estimateTokenCount(text: string): number {
   if (!text || text.length === 0) return 0;
+  
+  if (text.length < 2000 && tokenCache.has(text)) {
+    return tokenCache.get(text)!;
+  }
 
   // Split by whitespace and punctuation clusters
   const tokens = text
@@ -25,7 +33,17 @@ export function estimateTokenCount(text: string): number {
     }
   }
 
-  return Math.max(1, Math.round(count * 0.82));
+  const result = Math.max(1, Math.round(count * 0.82));
+
+  if (text.length < 2000) {
+    if (tokenCache.size >= MAX_CACHE_SIZE) {
+      const firstKey = tokenCache.keys().next().value;
+      if (firstKey) tokenCache.delete(firstKey);
+    }
+    tokenCache.set(text, result);
+  }
+
+  return result;
 }
 
 export function formatTokenCount(tokens: number): string {
@@ -36,16 +54,21 @@ export function formatTokenCount(tokens: number): string {
 }
 
 /**
- * Conversational filler phrases commonly produced by LLMs (ChatGPT, Claude, Gemini).
- * Stripping these saves substantial prompt tokens without losing semantic instructions.
+ * Conversational filler & sycophantic phrases produced by LLMs (ChatGPT, Claude, Gemini).
+ * Stripping these saves substantial prompt tokens without altering semantic instructions.
  */
 const FILLER_PATTERNS = [
-  // Greetings & Intros
+  // Sycophancy & Greetings
+  /^(?:great\s+question|that(?:'s|\s+is)\s+a\s+(?:great|wonderful|fantastic|good|fascinating)\s+(?:question|point|topic|inquiry))[,!.]?\s*/gim,
+  /^(?:thank\s+you\s+for\s+(?:reaching\s+out|asking|providing\s+(?:all\s+)?the\s+details))[,!.]?\s*/gim,
   /^(?:hello|hi|hey|greetings|good\s+(?:morning|afternoon|evening))[,!.]?\s*/gim,
   /^(?:certainly|sure|absolutely|of\s+course|gladly|definitely|no\s+problem)[!.,]\s*(?:i(?:'d|\s+would)?\s+be\s+happy\s+to\s+help(?:\s+you)?(?:\s+with\s+that)?[:.]?)?\s*/gim,
   /^(?:here\s+is|here\s+are|below\s+is|below\s+are)\s+(?:the|your)?\s*(?:requested|updated|complete|following)?\s*(?:code|summary|explanation|solution|details|response|answer)?[:.]?\s*/gim,
-  /^as\s+an\s+ai(?:\s+language\s+model)?,\s*/gim,
   /^i\s+understand\s+(?:that\s+)?you\s+(?:want|need|are\s+looking\s+for)[:.]?\s*/gim,
+
+  // Disclaimers & Model self-references
+  /^(?:as\s+(?:an\s+)?ai(?:\s+language\s+model)?|i\s+am\s+(?:an\s+)?ai(?:\s+language\s+model)?)[,.]?\s*(?:i\s+(?:cannot|can't|don't|do\s+not)\s+have\s+(?:feelings|personal\s+opinions|real-time\s+data)[^.\n]*[.\n]?)?/gim,
+  /^(?:it(?:'s|\s+is)\s+important\s+to\s+(?:note|remember|keep\s+in\s+mind)\s+that\s+as\s+an\s+ai[^.\n]*[.\n]?)/gim,
 
   // Outros & Pleasantries
   /(?:i\s+)?hope\s+this\s+helps[!.]?(?:\s+let\s+me\s+know\s+if\s+you\s+(?:have\s+(?:any\s+)?questions|need\s+(?:further\s+)?help)[!.]?)?$/gim,
@@ -121,10 +144,14 @@ export function cleanTextContent(text: string, aggressive = false): string {
   result = result.replace(/[ \t]+$/gm, "");
   result = result.replace(/[ \t]{2,}/g, " ");
 
+  // Clean repeated punctuation clusters (e.g. "????" -> "?", "!!!!" -> "!")
+  result = result.replace(/\?{2,}/g, "?");
+  result = result.replace(/!{2,}/g, "!");
+
   if (aggressive) {
     // Strip redundant markdown divider rules (---, ***, ___)
     result = result.replace(/^(?:[-*_]\s*){3,}$/gm, "");
-    // Collapse single newlines inside prose
+    // Collapse single newlines inside prose while respecting lists & headers
     result = result.replace(/([^\n])\n([^\n\-\*\d\.#\[<])/g, "$1 $2");
   }
 
@@ -133,19 +160,19 @@ export function cleanTextContent(text: string, aggressive = false): string {
 
 /**
  * Parses raw text or conversation logs into an ordered sequence of message turns.
- * Supports markdown headers (### User), bracket tags ([User]:), role prefixes, etc.
+ * Supports markdown headers (### User), bracket tags ([User]:), role prefixes, XML tags, etc.
  */
 export function parseRawTextToTurns(rawText: string): CapsuleMessage[] {
   if (!rawText || rawText.trim().length === 0) return [];
 
-  // Match common multi-turn delimiters
-  const turnRegex = /(?:^|\n)(?:###\s*(User|Human|You|Assistant|ChatGPT|Claude|Gemini|Bot)|\[(User|Assistant|Human|Claude|ChatGPT|Gemini|Bot)\]:?|(User|Assistant|Human|Claude|ChatGPT|Gemini):)\s*/gi;
+  // Match common multi-turn delimiters across LLM formats
+  const turnRegex = /(?:^|\n)(?:###\s*(User|Human|You|Assistant|ChatGPT|Claude|Gemini|Bot)|\[(?:Turn\s*\d+\s*[·\-:]\s*)?(User|Assistant|Human|Claude|ChatGPT|Gemini|Bot)\]:?|<turn\s+role="([^"]+)">|(?:Turn\s*\d+\s*[-:]\s*)?(User|Assistant|Human|Claude|ChatGPT|Gemini):)\s*/gi;
 
   const matches: { index: number; role: "user" | "assistant"; headerLength: number }[] = [];
   let match: RegExpExecArray | null;
 
   while ((match = turnRegex.exec(rawText)) !== null) {
-    const rawRole = (match[1] || match[2] || match[3] || "").toLowerCase();
+    const rawRole = (match[1] || match[2] || match[3] || match[4] || "").toLowerCase();
     const isUser = ["user", "human", "you"].includes(rawRole);
     matches.push({
       index: match.index,
@@ -164,7 +191,10 @@ export function parseRawTextToTurns(rawText: string): CapsuleMessage[] {
     const current = matches[i];
     const textStart = current.index + current.headerLength;
     const textEnd = i + 1 < matches.length ? matches[i + 1].index : rawText.length;
-    const text = rawText.slice(textStart, textEnd).trim();
+    let text = rawText.slice(textStart, textEnd).trim();
+
+    // Clean any trailing XML turn closure tags
+    text = text.replace(/<\/turn>$/gi, "").trim();
 
     if (text.length > 0) {
       turns.push({
@@ -223,7 +253,7 @@ export function buildStructuredContext(
   if (formatMode === "xml") {
     // 1. Structured XML Context Format (Optimal LLM understanding & lowest token overhead)
     const lines: string[] = [];
-    lines.push(`<context_transfer source="${sourcePlatform}"${title ? ` topic="${title}"` : ""}>`);
+    lines.push(`<context_transfer source="${sourcePlatform}"${title ? ` topic="${title.replace(/"/g, '&quot;')}"` : ""}>`);
     if (summary) {
       lines.push(`  <summary>${cleanTextContent(summary)}</summary>`);
     }

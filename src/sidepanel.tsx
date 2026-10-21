@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import "./style.css";
 import { useCapsuleStore } from "./storage/capsuleStore";
 import { Header } from "./components/Header";
@@ -7,6 +7,7 @@ import { CapsuleCard } from "./components/CapsuleCard";
 import { CapsuleEditorModal } from "./components/CapsuleEditorModal";
 import { ImportExportModal } from "./components/ImportExportModal";
 import { triggerActiveTabCapture } from "./utils/activeTab";
+import { estimateTokenCount } from "./utils/tokenOptimizer";
 import type { Capsule, CapsuleFilter } from "./types";
 import { Sparkles, Inbox, Plus, AlertCircle, CheckCircle2, Info, BookOpen } from "lucide-react";
 
@@ -55,6 +56,28 @@ export default function SidePanel() {
     setFilter((prev) => ({ ...prev, ...updated }));
   };
 
+  // Total tokens calculated across the entire library
+  const totalTokens = useMemo(() => {
+    return capsules.reduce((sum, c) => sum + estimateTokenCount(c.content), 0);
+  }, [capsules]);
+
+  // Keyboard shortcuts (Ctrl+N for new, Escape to dismiss)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        setEditingCapsule(null);
+        setIsEditorOpen(true);
+      }
+      if (e.key === "Escape") {
+        setIsEditorOpen(false);
+        setIsBackupModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const filteredCapsules = useMemo(() => {
     return capsules
       .filter((cap) => {
@@ -100,14 +123,34 @@ export default function SidePanel() {
     setIsCapturing(true);
     showToast("Extracting context from active tab...", "info");
 
-    const result = await triggerActiveTabCapture();
-    setIsCapturing(false);
+    try {
+      const result = await triggerActiveTabCapture();
+      setIsCapturing(false);
 
-    if (result.success && result.capsule) {
-      const saved = await saveCapsule(result.capsule);
-      showToast(`Captured: "${saved.title}"!`, "success");
-    } else {
-      showToast(result.error || "Unable to extract chat context", "error");
+      if (result.success && result.capsule) {
+        const newCap: Capsule = {
+          id: `cap-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          title: result.capsule.title || "Captured Context",
+          summary: result.capsule.summary || "Conversation capture",
+          content: result.capsule.content || "",
+          messages: result.capsule.messages,
+          platform: result.capsule.platform || "other",
+          sourceUrl: result.capsule.sourceUrl,
+          tags: result.capsule.tags || ["auto-capture"],
+          isPinned: false,
+          version: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          history: []
+        };
+        const saved = await saveCapsule(newCap);
+        showToast(`Captured: "${saved.title.slice(0, 24)}"`, "success");
+      } else {
+        showToast(result.error || "Unable to extract chat context", "error");
+      }
+    } catch (err: any) {
+      setIsCapturing(false);
+      showToast(err?.message || "Capture failed", "error");
     }
   };
 
@@ -130,6 +173,7 @@ export default function SidePanel() {
         onCaptureCurrentTab={handleCaptureCurrentTab}
         isCapturing={isCapturing}
         totalCapsules={capsules.length}
+        totalTokens={totalTokens}
       />
 
       {/* Search and Filters */}
@@ -177,7 +221,7 @@ export default function SidePanel() {
             <div className="flex flex-col items-center gap-2 mt-4">
               <button
                 onClick={handleOpenNew}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Create New Capsule</span>
@@ -189,7 +233,7 @@ export default function SidePanel() {
                     await loadSample();
                     showToast("Sample architect prompt added!", "success");
                   }}
-                  className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 transition pt-1"
+                  className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 transition pt-1 cursor-pointer"
                 >
                   <BookOpen className="w-3 h-3" />
                   <span>Load 1 Example Prompt</span>
