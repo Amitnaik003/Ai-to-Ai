@@ -1,0 +1,67 @@
+{
+  "name": "capsule-hub",
+  "displayName": "Capsule Hub - Context Transfer Extension",
+  "version": "1.0.0",
+  "description": "Cross-platform context-transfer extension for ChatGPT, Claude, Gemini, and Gmail with local-first library and smart injection.",
+  "author": "Capsule Hub",
+  "scripts": {
+    "dev": "plasmo dev",
+    "build": "plasmo build",
+    "package": "plasmo package"
+  },
+  "dependencies": {
+    "@plasmohq/storage": "^1.12.0",
+    "clsx": "^2.1.1",
+    "color-convert": "^2.0.1",
+    "lmdb": "^3.2.2",
+    "lucide-react": "^0.359.0",
+    "plasmo": "^0.90.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwind-merge": "^2.2.2"
+  },
+  "overrides": {
+    "node-gyp-build-optional-packages": "^5.2.2",
+    "node-gyp-build": "^4.8.4"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.260",
+    "@types/node": "^20.11.24",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "autoprefixer": "^10.4.19",
+    "cross-spawn": "^7.0.6",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3",
+    "typescript": "^5.4.5"
+  },
+  "manifest": {
+    "name": "Capsule Hub - Context Transfer",
+    "description": "Seamlessly capture, categorize, and transfer prompt contexts between ChatGPT, Claude, Gemini, and Gmail.",
+    "version": "1.0.0",
+    "permissions": [
+      "storage",
+      "sidePanel",
+      "activeTab",
+      "scripting",
+      "tabs",
+      "contextMenus"
+    ],
+    "host_permissions": [
+      "https://chatgpt.com/*",
+      "https://claude.ai/*",
+      "https://gemini.google.com/*",
+      "https://mail.google.com/*"
+    ],
+    "side_panel": {
+      "default_path": "sidepanel.html"
+    },
+    "action": {
+      "default_title": "Open Capsule Hub"
+    }
+  },
+  "optionalDependencies": {
+    "@parcel/fs-search-win32-x64-msvc": "npm:null@*",
+    "@parcel/watcher-win32-x64-msvc": "npm:null@*"
+  }
+}

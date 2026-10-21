@@ -1,0 +1,333 @@
+import type { CapsuleMessage, PlatformType } from "../types";
+
+/**
+ * Fast and accurate token count estimation for modern LLMs (GPT-4o, Claude 3.5, Gemini 1.5).
+ * Standard rule of thumb: ~4 characters or ~0.75 words per token in English,
+ * with adjustments for code, whitespace, and special punctuation.
+ */
+export function estimateTokenCount(text: string): number {
+  if (!text || text.length === 0) return 0;
+
+  // Split by whitespace and punctuation clusters
+  const tokens = text
+    .trim()
+    .split(/(\s+|[^\s\w]+|\w+)/)
+    .filter(Boolean);
+
+  let count = 0;
+  for (const token of tokens) {
+    if (/^\s+$/.test(token)) {
+      count += Math.max(1, Math.floor(token.length / 4));
+    } else if (/^[a-zA-Z0-9_]+$/.test(token)) {
+      count += Math.max(1, Math.ceil(token.length / 4));
+    } else {
+      count += Math.max(1, Math.ceil(token.length / 2));
+    }
+  }
+
+  return Math.max(1, Math.round(count * 0.82));
+}
+
+export function formatTokenCount(tokens: number): string {
+  if (tokens >= 1000) {
+    return `${(tokens / 1000).toFixed(1)}k tokens`;
+  }
+  return `${tokens} tokens`;
+}
+
+/**
+ * Conversational filler phrases commonly produced by LLMs (ChatGPT, Claude, Gemini).
+ * Stripping these saves substantial prompt tokens without losing semantic instructions.
+ */
+const FILLER_PATTERNS = [
+  // Greetings & Intros
+  /^(?:hello|hi|hey|greetings|good\s+(?:morning|afternoon|evening))[,!.]?\s*/gim,
+  /^(?:certainly|sure|absolutely|of\s+course|gladly|definitely|no\s+problem)[!.,]\s*(?:i(?:'d|\s+would)?\s+be\s+happy\s+to\s+help(?:\s+you)?(?:\s+with\s+that)?[:.]?)?\s*/gim,
+  /^(?:here\s+is|here\s+are|below\s+is|below\s+are)\s+(?:the|your)?\s*(?:requested|updated|complete|following)?\s*(?:code|summary|explanation|solution|details|response|answer)?[:.]?\s*/gim,
+  /^as\s+an\s+ai(?:\s+language\s+model)?,\s*/gim,
+  /^i\s+understand\s+(?:that\s+)?you\s+(?:want|need|are\s+looking\s+for)[:.]?\s*/gim,
+
+  // Outros & Pleasantries
+  /(?:i\s+)?hope\s+this\s+helps[!.]?(?:\s+let\s+me\s+know\s+if\s+you\s+(?:have\s+(?:any\s+)?questions|need\s+(?:further\s+)?help)[!.]?)?$/gim,
+  /(?:please\s+)?feel\s+free\s+to\s+ask\s+if\s+you\s+(?:have\s+(?:any\s+)?questions|need\s+(?:more\s+)?clarification)[!.]?$/gim,
+  /let\s+me\s+know\s+if\s+you(?:'d|\s+would)?\s+like\s+me\s+to\s+expand\s+on\s+anything[!.]?$/gim,
+  /(?:best\s+regards|sincerely|cheers|thanks|warmly),?\s*$/gim
+];
+
+export interface OptimizationResult {
+  optimized: string;
+  originalTokens: number;
+  optimizedTokens: number;
+  savedTokens: number;
+  savingsPercent: number;
+}
+
+export type StructureFormatMode = 'xml' | 'sequence' | 'compact';
+
+export interface StructureOptions {
+  formatMode?: StructureFormatMode;
+  sourcePlatform?: string;
+  title?: string;
+  summary?: string;
+  includeHandoff?: boolean;
+  aggressive?: boolean;
+}
+
+/**
+ * Protect code blocks from string operations to prevent altering code indentation,
+ * backticks, or code syntax.
+ */
+function protectCodeBlocks(text: string): { text: string; codeBlocks: string[] } {
+  const codeBlocks: string[] = [];
+  const protectedText = text.replace(/(```[\s\S]*?```|`[^`\n]+`)/g, (match) => {
+    codeBlocks.push(match);
+    return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
+  });
+  return { text: protectedText, codeBlocks };
+}
+
+function restoreCodeBlocks(text: string, codeBlocks: string[]): string {
+  return text.replace(/__CODE_BLOCK_(\d+)__/g, (_, idx) => {
+    return codeBlocks[parseInt(idx, 10)] || "";
+  });
+}
+
+/**
+ * Strips conversational filler and cleans whitespace within a text string,
+ * strictly keeping code blocks intact.
+ */
+export function cleanTextContent(text: string, aggressive = false): string {
+  if (!text) return "";
+  const { text: protectedText, codeBlocks } = protectCodeBlocks(text);
+
+  let result = protectedText;
+
+  // Process paragraph by paragraph to remove conversational preamble/outro
+  const paragraphs = result.split(/\n{2,}/);
+  const cleanedParagraphs = paragraphs
+    .map((p) => {
+      let cleaned = p.trim();
+      for (const pattern of FILLER_PATTERNS) {
+        cleaned = cleaned.replace(pattern, "").trim();
+      }
+      return cleaned;
+    })
+    .filter((p) => p.length > 0);
+
+  result = cleanedParagraphs.join("\n\n");
+
+  // Normalize excessive blank lines and trailing spaces
+  result = result.replace(/\n{3,}/g, "\n\n");
+  result = result.replace(/[ \t]+$/gm, "");
+  result = result.replace(/[ \t]{2,}/g, " ");
+
+  if (aggressive) {
+    // Strip redundant markdown divider rules (---, ***, ___)
+    result = result.replace(/^(?:[-*_]\s*){3,}$/gm, "");
+    // Collapse single newlines inside prose
+    result = result.replace(/([^\n])\n([^\n\-\*\d\.#\[<])/g, "$1 $2");
+  }
+
+  return restoreCodeBlocks(result, codeBlocks).trim();
+}
+
+/**
+ * Parses raw text or conversation logs into an ordered sequence of message turns.
+ * Supports markdown headers (### User), bracket tags ([User]:), role prefixes, etc.
+ */
+export function parseRawTextToTurns(rawText: string): CapsuleMessage[] {
+  if (!rawText || rawText.trim().length === 0) return [];
+
+  // Match common multi-turn delimiters
+  const turnRegex = /(?:^|\n)(?:###\s*(User|Human|You|Assistant|ChatGPT|Claude|Gemini|Bot)|\[(User|Assistant|Human|Claude|ChatGPT|Gemini|Bot)\]:?|(User|Assistant|Human|Claude|ChatGPT|Gemini):)\s*/gi;
+
+  const matches: { index: number; role: "user" | "assistant"; headerLength: number }[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = turnRegex.exec(rawText)) !== null) {
+    const rawRole = (match[1] || match[2] || match[3] || "").toLowerCase();
+    const isUser = ["user", "human", "you"].includes(rawRole);
+    matches.push({
+      index: match.index,
+      role: isUser ? "user" : "assistant",
+      headerLength: match[0].length
+    });
+  }
+
+  if (matches.length === 0) {
+    // Single block of content
+    return [{ role: "user", text: rawText.trim() }];
+  }
+
+  const turns: CapsuleMessage[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const current = matches[i];
+    const textStart = current.index + current.headerLength;
+    const textEnd = i + 1 < matches.length ? matches[i + 1].index : rawText.length;
+    const text = rawText.slice(textStart, textEnd).trim();
+
+    if (text.length > 0) {
+      turns.push({
+        role: current.role,
+        text
+      });
+    }
+  }
+
+  return turns;
+}
+
+/**
+ * Builds a structured, chronologically sequenced context payload with minimal token consumption.
+ *
+ * Supported formats:
+ * 1. 'xml': Standardized XML tags (<context_transfer>, <dialogue_sequence>, <turn>)
+ *    Recommended by Anthropic & OpenAI for zero-hallucination context handoff.
+ * 2. 'sequence': Clean numbered turns ([Turn 1 · User], [Turn 2 · Assistant])
+ * 3. 'compact': Minimal dialogue headers ([User]:, [Assistant]:) with no wrapping overhead.
+ */
+export function buildStructuredContext(
+  turnsOrText: CapsuleMessage[] | string,
+  options: StructureOptions = {}
+): OptimizationResult {
+  const {
+    formatMode = "xml",
+    sourcePlatform = "AI Context",
+    title = "",
+    summary = "",
+    includeHandoff = true,
+    aggressive = false
+  } = options;
+
+  let turns: CapsuleMessage[] = [];
+  let rawText = "";
+
+  if (typeof turnsOrText === "string") {
+    rawText = turnsOrText;
+    turns = parseRawTextToTurns(turnsOrText);
+  } else {
+    turns = turnsOrText;
+    rawText = turns.map((t) => `${t.role}: ${t.text}`).join("\n\n");
+  }
+
+  const originalTokens = estimateTokenCount(rawText);
+
+  // Clean each turn's text
+  const cleanedTurns = turns.map((turn) => ({
+    role: turn.role,
+    text: cleanTextContent(turn.text, aggressive)
+  })).filter((t) => t.text.length > 0);
+
+  let formattedOutput = "";
+
+  if (formatMode === "xml") {
+    // 1. Structured XML Context Format (Optimal LLM understanding & lowest token overhead)
+    const lines: string[] = [];
+    lines.push(`<context_transfer source="${sourcePlatform}"${title ? ` topic="${title}"` : ""}>`);
+    if (summary) {
+      lines.push(`  <summary>${cleanTextContent(summary)}</summary>`);
+    }
+    lines.push(`  <dialogue_sequence>`);
+    cleanedTurns.forEach((turn, idx) => {
+      lines.push(`    <turn index="${idx + 1}" role="${turn.role}">`);
+      lines.push(`      ${turn.text.replace(/\n/g, "\n      ")}`);
+      lines.push(`    </turn>`);
+    });
+    lines.push(`  </dialogue_sequence>`);
+    if (includeHandoff) {
+      lines.push(`  <handoff_instruction>Continue assisting seamlessly from the latest turn above without re-answering previous steps.</handoff_instruction>`);
+    }
+    lines.push(`</context_transfer>`);
+    formattedOutput = lines.join("\n");
+
+  } else if (formatMode === "sequence") {
+    // 2. Numbered Sequence Format
+    const parts: string[] = [];
+    if (title || sourcePlatform) {
+      parts.push(`[CONTEXT: ${sourcePlatform.toUpperCase()}${title ? ` | ${title}` : ""}]`);
+    }
+    if (summary) {
+      parts.push(`Summary: ${cleanTextContent(summary)}`);
+    }
+    parts.push("");
+
+    cleanedTurns.forEach((turn, idx) => {
+      const roleLabel = turn.role === "user" ? "User" : "Assistant";
+      parts.push(`[Turn ${idx + 1} · ${roleLabel}]:\n${turn.text}`);
+      parts.push("");
+    });
+
+    if (includeHandoff) {
+      parts.push(`[Instruction]: Continue from the above context seamlessly.`);
+    }
+    formattedOutput = parts.join("\n").trim();
+
+  } else {
+    // 3. Compact Dialogue Format
+    const parts: string[] = [];
+    cleanedTurns.forEach((turn) => {
+      const roleTag = turn.role === "user" ? "[User]:" : "[Assistant]:";
+      parts.push(`${roleTag} ${turn.text}`);
+    });
+    formattedOutput = parts.join("\n\n").trim();
+  }
+
+  const optimizedTokens = estimateTokenCount(formattedOutput);
+  const savedTokens = Math.max(0, originalTokens - optimizedTokens);
+  const savingsPercent =
+    originalTokens > 0 ? Math.round((savedTokens / originalTokens) * 100) : 0;
+
+  return {
+    optimized: formattedOutput,
+    originalTokens,
+    optimizedTokens,
+    savedTokens,
+    savingsPercent
+  };
+}
+
+/**
+ * General purpose optimizer keeping backward compatibility with existing components
+ */
+export function optimizeContext(
+  text: string,
+  options: {
+    stripFillers?: boolean;
+    compactHeaders?: boolean;
+    normalizeWhitespace?: boolean;
+    aggressive?: boolean;
+  } = {}
+): OptimizationResult {
+  if (!text || text.trim().length === 0) {
+    return {
+      optimized: "",
+      originalTokens: 0,
+      optimizedTokens: 0,
+      savedTokens: 0,
+      savingsPercent: 0
+    };
+  }
+
+  const originalTokens = estimateTokenCount(text);
+  const cleaned = cleanTextContent(text, options.aggressive);
+
+  // Compact header markers
+  let result = cleaned
+    .replace(/###\s*(?:User|Human|You):\s*/gi, "[User]: ")
+    .replace(/###\s*(?:ChatGPT|Claude|Gemini|Assistant|Bot):\s*/gi, "[Assistant]: ")
+    .replace(/---\s*(?:Email\s*#?\d*|Message)\s*---\s*/gi, "[Message]: ");
+
+  const optimized = result.trim();
+  const optimizedTokens = estimateTokenCount(optimized);
+  const savedTokens = Math.max(0, originalTokens - optimizedTokens);
+  const savingsPercent =
+    originalTokens > 0 ? Math.round((savedTokens / originalTokens) * 100) : 0;
+
+  return {
+    optimized,
+    originalTokens,
+    optimizedTokens,
+    savedTokens,
+    savingsPercent
+  };
+}
