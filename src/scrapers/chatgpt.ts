@@ -1,5 +1,5 @@
 import type { CapsuleMessage, Capsule } from "../types";
-import { buildStructuredContext } from "../utils/tokenOptimizer";
+import { distillSmartCapsule } from "../utils/tokenOptimizer";
 
 export function extractChatGPTChat(): Partial<Capsule> {
   const messages: CapsuleMessage[] = [];
@@ -42,22 +42,20 @@ export function extractChatGPTChat(): Partial<Capsule> {
       ? `Conversation with ${messages.length} messages. First prompt: ${messages[0]?.text.slice(0, 90)}...`
       : "Captured conversation from ChatGPT";
 
-  // Build structured, sequence-guaranteed, token-efficient payload
-  const structured = buildStructuredContext(messages, {
-    formatMode: "xml",
+  // Distill into ultra-low token Smart Capsule directly on capture (saving 80%-95% tokens)
+  const distilled = distillSmartCapsule(messages, {
     sourcePlatform: "ChatGPT",
     title,
-    summary,
-    includeHandoff: true
+    summary
   });
 
   return {
     title,
     summary,
-    content: structured.optimized || (document.body.innerText?.slice(0, 2000) ?? ""),
+    content: distilled.optimized || (document.body.innerText?.slice(0, 2000) ?? ""),
     messages,
     platform: "chatgpt",
     sourceUrl: window.location.href,
-    tags: ["chatgpt", "conversation"]
+    tags: ["chatgpt", "low-token-capsule"]
   };
 }

@@ -283,6 +283,17 @@ export function distillSmartCapsule(
 
   if (typeof turnsOrText === "string") {
     rawText = turnsOrText;
+    // If the text is already an optimized Smart Capsule, return as is to avoid redundant re-wrapping
+    if (rawText.includes("<context_capsule") && rawText.includes("</context_capsule>")) {
+      const orig = estimateTokenCount(rawText);
+      return {
+        optimized: rawText,
+        originalTokens: orig,
+        optimizedTokens: orig,
+        savedTokens: 0,
+        savingsPercent: 0
+      };
+    }
     turns = parseRawTextToTurns(turnsOrText);
   } else {
     turns = turnsOrText;

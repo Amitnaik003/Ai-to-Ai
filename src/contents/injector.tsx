@@ -3,7 +3,7 @@ import type { PlasmoCSConfig } from "plasmo";
 import { findActivePromptInput, injectTextIntoElement } from "../injector";
 import { extractCurrentPageChat, detectCurrentPlatform } from "../scrapers";
 import { CapsuleStore } from "../storage/capsuleStore";
-import { optimizeContext } from "../utils/tokenOptimizer";
+import { distillSmartCapsule } from "../utils/tokenOptimizer";
 import { Sparkles, ArrowRight, X } from "lucide-react";
 
 export const config: PlasmoCSConfig = {
@@ -59,29 +59,36 @@ export default function FloatingCapsuleWidget() {
   const platform = detectCurrentPlatform();
 
   const handleCapture = async () => {
-    setStatus("Extracting...");
+    setStatus("Extracting & Distilling...");
     try {
       const extracted = extractCurrentPageChat();
       const rawContent = extracted.content || "";
-      const opt = optimizeContext(rawContent);
-      const content = opt.optimized || rawContent;
+      
+      // Ultra-low token distillation on capture
+      const distilled = distillSmartCapsule(extracted.messages || rawContent, {
+        sourcePlatform: platform.toUpperCase(),
+        title: extracted.title || "Quick Capture",
+        summary: extracted.summary || "Conversation capture"
+      });
+      const content = distilled.optimized || rawContent;
 
       const saved = await CapsuleStore.saveCapsule({
         id: `cap-${Date.now()}`,
         title: extracted.title || "Quick Capture",
         summary: extracted.summary || "Conversation capture",
         content,
+        messages: extracted.messages,
         platform: extracted.platform || platform,
         sourceUrl: window.location.href,
-        tags: [platform, "auto-captured"],
+        tags: [platform, "low-token-capsule"],
         isPinned: false,
         version: 1,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
 
-      const tokensSavedText = opt.savedTokens > 0 ? ` (-${opt.savedTokens} tokens)` : "";
-      setStatus(`Saved "${saved.title.slice(0, 16)}..."${tokensSavedText}!`);
+      const savingsMsg = distilled.savedTokens > 0 ? ` (Saved ${distilled.savedTokens} tokens!)` : "";
+      setStatus(`Saved Low-Token Capsule!${savingsMsg}`);
       setTimeout(() => {
         setStatus(null);
         setIsOpen(false);
@@ -179,7 +186,7 @@ export default function FloatingCapsuleWidget() {
                   gap: "6px",
                   padding: "8px 12px",
                   borderRadius: "8px",
-                  background: "#4f46e5",
+                  background: "#10b981",
                   color: "#ffffff",
                   fontSize: "11px",
                   fontWeight: 600,
@@ -189,7 +196,7 @@ export default function FloatingCapsuleWidget() {
                 }}
               >
                 <Sparkles size={12} />
-                <span>Capture Current Chat</span>
+                <span>Capture Low-Token Capsule</span>
               </button>
 
               <button
@@ -218,7 +225,7 @@ export default function FloatingCapsuleWidget() {
       ) : (
         <button
           onClick={() => setIsOpen(true)}
-          title="Capsule Hub - Context Transfer"
+          title="Capsule Hub - Low-Token Context Transfer"
           style={{
             display: "flex",
             alignItems: "center",
@@ -226,9 +233,9 @@ export default function FloatingCapsuleWidget() {
             width: "42px",
             height: "42px",
             borderRadius: "50%",
-            background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+            background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
             color: "#ffffff",
-            boxShadow: "0 4px 14px 0 rgba(79, 70, 229, 0.4)",
+            boxShadow: "0 4px 14px 0 rgba(16, 185, 129, 0.4)",
             border: "2px solid #ffffff",
             cursor: "pointer",
             transition: "transform 0.2s, box-shadow 0.2s"

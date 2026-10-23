@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Storage } from "@plasmohq/storage";
 import type { Capsule, Folder, CapsuleVersion } from "../types";
+import { estimateTokenCount, distillSmartCapsule } from "../utils/tokenOptimizer";
 
 const storage = new Storage({ area: "local" });
 
@@ -142,6 +143,66 @@ export const CapsuleStore = {
     const items = await this.getCapsules();
     const updated = items.map((c) => (c.id === id ? { ...c, isPinned: !c.isPinned } : c));
     await safeSet(CAPSULES_KEY, updated);
+  },
+
+  /**
+   * Compresses all oversized capsules (> 1,200 tokens) in the library down to
+   * compact Smart Capsules, saving 80% to 95% tokens.
+   */
+  async compressAllOversizedCapsules(): Promise<{
+    compressedCount: number;
+    originalTotalTokens: number;
+    newTotalTokens: number;
+    savedTokens: number;
+  }> {
+    const items = await this.getCapsules();
+    let compressedCount = 0;
+    let originalTotalTokens = 0;
+    let newTotalTokens = 0;
+
+    const updated = items.map((c) => {
+      const origTok = estimateTokenCount(c.content);
+      originalTotalTokens += origTok;
+
+      // If already small or <= 1200 tokens, keep as is
+      if (origTok <= 1200) {
+        newTotalTokens += origTok;
+        return c;
+      }
+
+      // Distill into smart capsule
+      const distilled = distillSmartCapsule(c.messages || c.content, {
+        sourcePlatform: c.platform.toUpperCase(),
+        title: c.title,
+        summary: c.summary
+      });
+
+      if (distilled.optimizedTokens < origTok) {
+        compressedCount++;
+        newTotalTokens += distilled.optimizedTokens;
+        return {
+          ...c,
+          content: distilled.optimized,
+          version: c.version + 1,
+          updatedAt: new Date().toISOString(),
+          tags: Array.from(new Set([...(c.tags || []), "distilled-smart"]))
+        };
+      } else {
+        newTotalTokens += origTok;
+        return c;
+      }
+    });
+
+    if (compressedCount > 0) {
+      await safeSet(CAPSULES_KEY, updated);
+    }
+
+    return {
+      compressedCount,
+      originalTotalTokens,
+      newTotalTokens,
+      savedTokens: Math.max(0, originalTotalTokens - newTotalTokens)
+    };
   },
 
   async getFolders(): Promise<Folder[]> {
@@ -299,6 +360,11 @@ export function useCapsuleStore() {
     exportJSON: CapsuleStore.exportJSON,
     importJSON: async (json: string) => {
       const result = await CapsuleStore.importJSON(json);
+      await refresh();
+      return result;
+    },
+    compressAllOversizedCapsules: async () => {
+      const result = await CapsuleStore.compressAllOversizedCapsules();
       await refresh();
       return result;
     }

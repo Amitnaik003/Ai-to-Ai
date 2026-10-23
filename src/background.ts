@@ -1,6 +1,6 @@
 import { CapsuleStore } from "./storage/capsuleStore";
 import type { PlatformType } from "./types";
-import { optimizeContext } from "./utils/tokenOptimizer";
+import { optimizeContext, distillSmartCapsule } from "./utils/tokenOptimizer";
 
 // Configure side panel to open on extension action icon click
 chrome.runtime.onInstalled.addListener(() => {
@@ -76,17 +76,22 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       if (response?.success && response?.capsule) {
         const platform = response.capsule.platform || detectPlatformFromUrl(tab.url);
         const rawContent = response.capsule.content || "";
-        const optimized = optimizeContext(rawContent);
-        const content = optimized.optimized || rawContent;
+        const distilled = distillSmartCapsule(response.capsule.messages || rawContent, {
+          sourcePlatform: platform.toUpperCase(),
+          title: response.capsule.title || "Full Chat Capture",
+          summary: response.capsule.summary || "Captured conversation"
+        });
+        const content = distilled.optimized || rawContent;
 
         await CapsuleStore.saveCapsule({
           id: `cap-${Date.now()}`,
           title: response.capsule.title || "Full Chat Capture",
           summary: response.capsule.summary || "Captured conversation",
           content,
+          messages: response.capsule.messages,
           platform,
           sourceUrl: tab.url,
-          tags: [platform, "auto-captured"],
+          tags: [platform, "low-token-capsule"],
           isPinned: false,
           version: 1,
           createdAt: new Date().toISOString(),
