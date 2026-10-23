@@ -1,6 +1,6 @@
 import { CapsuleStore } from "./storage/capsuleStore";
 import type { PlatformType } from "./types";
-import { optimizeContext, distillSmartCapsule } from "./utils/tokenOptimizer";
+import { optimizeContext, buildStructuredContext } from "./utils/tokenOptimizer";
 
 // Configure side panel to open on extension action icon click
 chrome.runtime.onInstalled.addListener(() => {
@@ -76,12 +76,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       if (response?.success && response?.capsule) {
         const platform = response.capsule.platform || detectPlatformFromUrl(tab.url);
         const rawContent = response.capsule.content || "";
-        const distilled = distillSmartCapsule(response.capsule.messages || rawContent, {
+        const structured = buildStructuredContext(response.capsule.messages || rawContent, {
+          formatMode: "xml",
           sourcePlatform: platform.toUpperCase(),
           title: response.capsule.title || "Full Chat Capture",
-          summary: response.capsule.summary || "Captured conversation"
+          summary: response.capsule.summary || "Captured conversation",
+          includeHandoff: true
         });
-        const content = distilled.optimized || rawContent;
+        const content = structured.optimized || rawContent;
 
         await CapsuleStore.saveCapsule({
           id: `cap-${Date.now()}`,
@@ -91,7 +93,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
           messages: response.capsule.messages,
           platform,
           sourceUrl: tab.url,
-          tags: [platform, "low-token-capsule"],
+          tags: [platform, "structured-context"],
           isPinned: false,
           version: 1,
           createdAt: new Date().toISOString(),

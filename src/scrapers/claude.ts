@@ -1,5 +1,5 @@
 import type { CapsuleMessage, Capsule } from "../types";
-import { distillSmartCapsule } from "../utils/tokenOptimizer";
+import { buildStructuredContext } from "../utils/tokenOptimizer";
 
 export function extractClaudeChat(): Partial<Capsule> {
   const messages: CapsuleMessage[] = [];
@@ -49,20 +49,22 @@ export function extractClaudeChat(): Partial<Capsule> {
       ? `Claude chat (${messages.length} messages). First prompt: ${messages[0]?.text.slice(0, 90)}...`
       : "Captured conversation from Claude";
 
-  // Distill into ultra-low token Smart Capsule directly on capture (saving 80%-95% tokens)
-  const distilled = distillSmartCapsule(messages, {
+  // Build clean structured context preserving all turns while reducing token fluff
+  const structured = buildStructuredContext(messages, {
+    formatMode: "xml",
     sourcePlatform: "Claude",
     title,
-    summary
+    summary,
+    includeHandoff: true
   });
 
   return {
     title,
     summary,
-    content: distilled.optimized || (document.body.innerText?.slice(0, 2000) ?? ""),
+    content: structured.optimized || (document.body.innerText?.slice(0, 2000) ?? ""),
     messages,
     platform: "claude",
     sourceUrl: window.location.href,
-    tags: ["claude", "low-token-capsule"]
+    tags: ["claude", "structured-context"]
   };
 }

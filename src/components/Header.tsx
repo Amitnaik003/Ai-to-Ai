@@ -6,24 +6,18 @@ interface HeaderProps {
   onNewCapsule: () => void;
   onOpenImportExport: () => void;
   onCaptureCurrentTab: () => void;
-  onCompressLibrary?: () => void;
   isCapturing: boolean;
-  isCompressing?: boolean;
   totalCapsules: number;
   totalTokens?: number;
-  oversizedCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onNewCapsule,
   onOpenImportExport,
   onCaptureCurrentTab,
-  onCompressLibrary,
   isCapturing,
-  isCompressing = false,
   totalCapsules,
-  totalTokens,
-  oversizedCount = 0
+  totalTokens
 }) => {
   return (
     <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200 px-3.5 py-2.5">
@@ -55,18 +49,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5">
-          {oversizedCount > 0 && onCompressLibrary && (
-            <button
-              onClick={onCompressLibrary}
-              disabled={isCompressing}
-              title={`Compress ${oversizedCount} oversized capsule(s) down to compact Smart Capsules (-90% tokens)`}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white shadow-xs transition animate-pulse cursor-pointer"
-            >
-              <Zap className="w-3.5 h-3.5 fill-white" />
-              <span className="hidden sm:inline">{isCompressing ? "Compressing..." : `Compress (${oversizedCount})`}</span>
-            </button>
-          )}
-
           <button
             onClick={onCaptureCurrentTab}
             disabled={isCapturing}

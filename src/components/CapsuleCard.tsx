@@ -82,9 +82,9 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
   const [copied, setCopied] = useState(false);
   const [isInjecting, setIsInjecting] = useState(false);
   const [injectSuccess, setInjectSuccess] = useState(false);
-  const [transferMode, setTransferMode] = useState<TransferMode>("smart");
+  const [transferMode, setTransferMode] = useState<TransferMode>("clean");
   const [isDistilling, setIsDistilling] = useState(false);
-  const [previewTab, setPreviewTab] = useState<TransferMode>("smart");
+  const [previewTab, setPreviewTab] = useState<TransferMode>("clean");
 
   const style = PLATFORM_STYLES[capsule.platform] || PLATFORM_STYLES.manual;
 
@@ -137,13 +137,12 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
       await navigator.clipboard.writeText(activePayload);
       setCopied(true);
 
-      if (transferMode === "smart" && smartCapsule.savedTokens > 0) {
-        onShowToast(
-          `Copied Smart Capsule! Saved ${smartCapsule.savedTokens} tokens (-${smartCapsule.savingsPercent}%) ⚡`,
-          "success"
-        );
+      if (transferMode === "clean") {
+        onShowToast("Copied full structured sequence to clipboard!", "success");
+      } else if (transferMode === "smart") {
+        onShowToast(`Copied condensed capsule (${formatTokenCount(smartCapsule.optimizedTokens)})!`, "success");
       } else {
-        onShowToast("Copied context to clipboard!", "success");
+        onShowToast("Copied raw context to clipboard!", "success");
       }
 
       setTimeout(() => setCopied(false), 2000);
@@ -161,13 +160,12 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
 
     if (result.success) {
       setInjectSuccess(true);
-      if (transferMode === "smart" && smartCapsule.savedTokens > 0) {
-        onShowToast(
-          `Injected Smart Capsule! Saved ${smartCapsule.savedTokens} tokens (-${smartCapsule.savingsPercent}%) into active chat! 🚀`,
-          "success"
-        );
+      if (transferMode === "clean") {
+        onShowToast("Injected full structured sequence into chat! 🚀", "success");
+      } else if (transferMode === "smart") {
+        onShowToast("Injected condensed capsule into chat! 🚀", "success");
       } else {
-        onShowToast("Injected context into active chat input!", "success");
+        onShowToast("Injected raw context into chat input!", "success");
       }
       setTimeout(() => setInjectSuccess(false), 2500);
     } else {
@@ -212,22 +210,13 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
             {style.label}
           </span>
 
-          {/* Real-time Token Badge: Shows smart optimized vs raw */}
+          {/* Real-time Token Badge */}
           <span
-            title={`Raw chat: ${formatTokenCount(rawTokens)} (${capsule.content.length} chars) | Smart Capsule: ${formatTokenCount(smartCapsule.optimizedTokens)} (Saves ${smartCapsule.savedTokens} tokens)`}
-            className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
-              transferMode === "smart" && hasBigSavings
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                : "bg-indigo-50/90 text-indigo-700 border-indigo-200/70"
-            }`}
+            title={`Token estimation: ${formatTokenCount(activeTokens)} (${capsule.content.length} characters)`}
+            className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-indigo-50/90 text-indigo-700 border-indigo-200/70"
           >
-            <Zap className={`w-2.5 h-2.5 ${transferMode === "smart" ? "fill-emerald-600 text-emerald-600" : "fill-indigo-600 text-indigo-600"}`} />
+            <Zap className="w-2.5 h-2.5 fill-indigo-600 text-indigo-600" />
             <span>{formatTokenCount(activeTokens)}</span>
-            {transferMode === "smart" && hasBigSavings && (
-              <span className="text-[9px] bg-emerald-200/70 text-emerald-900 px-1 rounded-sm font-bold">
-                -{smartCapsule.savingsPercent}%
-              </span>
-            )}
           </span>
 
           {capsule.version > 1 && (
@@ -246,19 +235,6 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Quick Distill Action if chat is large */}
-          {hasBigSavings && onUpdateCapsule && (
-            <button
-              onClick={handleDistillInPlace}
-              disabled={isDistilling}
-              title={`Permanently compress into a Smart Capsule (saves ${smartCapsule.savedTokens} tokens)`}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer"
-            >
-              <Zap className="w-2.5 h-2.5 fill-emerald-600 text-emerald-600" />
-              <span>Distill (-{formatTokenCount(smartCapsule.savedTokens)})</span>
-            </button>
-          )}
-
           <button
             onClick={() => onTogglePin(capsule.id)}
             title={capsule.isPinned ? "Unpin capsule" : "Pin to top"}
@@ -306,16 +282,6 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
             {/* View Tabs */}
             <div className="flex items-center bg-slate-100 p-0.5 rounded-md text-[10px] shadow-2xs">
               <button
-                onClick={() => setPreviewTab("smart")}
-                className={`px-2 py-0.5 rounded font-medium transition cursor-pointer ${
-                  previewTab === "smart"
-                    ? "bg-white text-emerald-700 shadow-2xs font-bold"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                ⚡ Smart Capsule (~{formatTokenCount(smartCapsule.optimizedTokens)})
-              </button>
-              <button
                 onClick={() => setPreviewTab("clean")}
                 className={`px-2 py-0.5 rounded font-medium transition cursor-pointer ${
                   previewTab === "clean"
@@ -323,7 +289,7 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
                     : "text-slate-500 hover:text-slate-800"
                 }`}
               >
-                Clean Turns
+                Clean Sequence
               </button>
               <button
                 onClick={() => setPreviewTab("raw")}
@@ -334,6 +300,16 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
                 }`}
               >
                 Raw ({formatTokenCount(rawTokens)})
+              </button>
+              <button
+                onClick={() => setPreviewTab("smart")}
+                className={`px-2 py-0.5 rounded font-medium transition cursor-pointer ${
+                  previewTab === "smart"
+                    ? "bg-white text-emerald-700 shadow-2xs font-bold"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                ⚡ Condensed (~{formatTokenCount(smartCapsule.optimizedTokens)})
               </button>
             </div>
 
@@ -424,19 +400,8 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
             <span>{copied ? "Copied" : "Copy"}</span>
           </button>
 
-          {/* 3-Tier Mode Selector */}
+          {/* Mode Selector */}
           <div className="flex items-center bg-slate-100 p-0.5 rounded-md border border-slate-200 text-[10px] font-semibold">
-            <button
-              onClick={() => setTransferMode("smart")}
-              className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
-                transferMode === "smart"
-                  ? "bg-emerald-600 text-white shadow-2xs font-bold"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-              title="Smart Capsule: distills previous 30+ turns into key rules, code, and active task (80%-95% token savings)"
-            >
-              ⚡ Smart
-            </button>
             <button
               onClick={() => setTransferMode("clean")}
               className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
@@ -444,9 +409,9 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
                   ? "bg-indigo-600 text-white shadow-2xs font-bold"
                   : "text-slate-500 hover:text-slate-800"
               }`}
-              title="Clean Turns: full conversation sequence with pleasantries and filler removed"
+              title="Full Sequence: all conversation turns preserved in sequence with filler stripped to optimize tokens"
             >
-              Turns
+              Sequence
             </button>
             <button
               onClick={() => setTransferMode("raw")}
@@ -458,6 +423,17 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
               title="Raw: untouched original text payload"
             >
               Raw
+            </button>
+            <button
+              onClick={() => setTransferMode("smart")}
+              className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
+                transferMode === "smart"
+                  ? "bg-emerald-600 text-white shadow-2xs font-bold"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+              title="Condensed: key rules, code, and active task only"
+            >
+              ⚡ Condensed
             </button>
           </div>
         </div>

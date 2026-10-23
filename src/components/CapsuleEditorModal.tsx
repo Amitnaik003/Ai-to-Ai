@@ -31,7 +31,7 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
   const [platform, setPlatform] = useState<PlatformType>("manual");
   const [folderId, setFolderId] = useState<string>("");
   const [tagsInput, setTagsInput] = useState("");
-  const [selectedFormat, setSelectedFormat] = useState<StructureFormatMode>("smart_capsule");
+  const [selectedFormat, setSelectedFormat] = useState<StructureFormatMode>("xml");
 
   const [feedback, setFeedback] = useState<{
     originalTokens: number;
@@ -263,18 +263,6 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
                 <div className="flex items-center bg-white p-0.5 rounded-lg border border-slate-200 text-[10px] font-medium shadow-2xs">
                   <button
                     type="button"
-                    onClick={() => setSelectedFormat("smart_capsule")}
-                    className={`px-2 py-0.5 rounded transition cursor-pointer ${
-                      selectedFormat === "smart_capsule"
-                        ? "bg-emerald-600 text-white font-bold shadow-xs"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                    title="Smart Capsule: extracts key rules, code, and active task (80%-95% token reduction)"
-                  >
-                    ⚡ Smart (~90% Less)
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setSelectedFormat("xml")}
                     className={`px-2 py-0.5 rounded transition cursor-pointer ${
                       selectedFormat === "xml"
@@ -308,6 +296,18 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
                     title="Compact Dialogue ([User]: ..., [Assistant]: ...)"
                   >
                     Compact
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFormat("smart_capsule")}
+                    className={`px-2 py-0.5 rounded transition cursor-pointer ${
+                      selectedFormat === "smart_capsule"
+                        ? "bg-emerald-600 text-white font-bold shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                    title="Smart Capsule: extracts key rules, code, and active task (80%-95% token reduction)"
+                  >
+                    ⚡ Smart
                   </button>
                 </div>
               </div>

@@ -3,7 +3,7 @@ import type { PlasmoCSConfig } from "plasmo";
 import { findActivePromptInput, injectTextIntoElement } from "../injector";
 import { extractCurrentPageChat, detectCurrentPlatform } from "../scrapers";
 import { CapsuleStore } from "../storage/capsuleStore";
-import { distillSmartCapsule } from "../utils/tokenOptimizer";
+import { buildStructuredContext } from "../utils/tokenOptimizer";
 import { Sparkles, ArrowRight, X } from "lucide-react";
 
 export const config: PlasmoCSConfig = {
@@ -59,18 +59,20 @@ export default function FloatingCapsuleWidget() {
   const platform = detectCurrentPlatform();
 
   const handleCapture = async () => {
-    setStatus("Extracting & Distilling...");
+    setStatus("Extracting...");
     try {
       const extracted = extractCurrentPageChat();
       const rawContent = extracted.content || "";
       
-      // Ultra-low token distillation on capture
-      const distilled = distillSmartCapsule(extracted.messages || rawContent, {
+      // Preserve full conversation sequence in clean structured format
+      const structured = buildStructuredContext(extracted.messages || rawContent, {
+        formatMode: "xml",
         sourcePlatform: platform.toUpperCase(),
         title: extracted.title || "Quick Capture",
-        summary: extracted.summary || "Conversation capture"
+        summary: extracted.summary || "Conversation capture",
+        includeHandoff: true
       });
-      const content = distilled.optimized || rawContent;
+      const content = structured.optimized || rawContent;
 
       const saved = await CapsuleStore.saveCapsule({
         id: `cap-${Date.now()}`,
@@ -80,15 +82,14 @@ export default function FloatingCapsuleWidget() {
         messages: extracted.messages,
         platform: extracted.platform || platform,
         sourceUrl: window.location.href,
-        tags: [platform, "low-token-capsule"],
+        tags: [platform, "structured-context"],
         isPinned: false,
         version: 1,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
 
-      const savingsMsg = distilled.savedTokens > 0 ? ` (Saved ${distilled.savedTokens} tokens!)` : "";
-      setStatus(`Saved Low-Token Capsule!${savingsMsg}`);
+      setStatus("Saved Structured Capsule!");
       setTimeout(() => {
         setStatus(null);
         setIsOpen(false);

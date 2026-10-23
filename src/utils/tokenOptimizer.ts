@@ -396,7 +396,7 @@ export function buildStructuredContext(
   options: StructureOptions = {}
 ): OptimizationResult {
   const {
-    formatMode = "smart_capsule",
+    formatMode = "xml",
     sourcePlatform = "AI Context",
     title = "",
     summary = "",

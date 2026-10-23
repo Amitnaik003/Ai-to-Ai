@@ -1,5 +1,5 @@
 import type { CapsuleMessage, Capsule } from "../types";
-import { distillSmartCapsule } from "../utils/tokenOptimizer";
+import { buildStructuredContext } from "../utils/tokenOptimizer";
 
 export function extractGmailChat(): Partial<Capsule> {
   const messages: CapsuleMessage[] = [];
@@ -21,10 +21,12 @@ export function extractGmailChat(): Partial<Capsule> {
     }
   });
 
-  const distilled = distillSmartCapsule(messages, {
+  const structured = buildStructuredContext(messages, {
+    formatMode: "xml",
     sourcePlatform: "Gmail",
     title: subject,
-    summary: `Email thread with ${messages.length} message(s)`
+    summary: `Email thread with ${messages.length} message(s)`,
+    includeHandoff: true
   });
 
   return {
@@ -33,10 +35,10 @@ export function extractGmailChat(): Partial<Capsule> {
       messages.length > 0
         ? `Email thread: "${subject}". Contains ${messages.length} message(s).`
         : "Captured email content from Gmail",
-    content: distilled.optimized || (document.body.innerText?.slice(0, 1500) ?? ""),
+    content: structured.optimized || (document.body.innerText?.slice(0, 1500) ?? ""),
     messages,
     platform: "gmail",
     sourceUrl: window.location.href,
-    tags: ["gmail", "low-token-email"]
+    tags: ["gmail", "structured-email"]
   };
 }

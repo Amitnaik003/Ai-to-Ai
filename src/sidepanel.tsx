@@ -62,39 +62,6 @@ export default function SidePanel() {
     return capsules.reduce((sum, c) => sum + estimateTokenCount(c.content), 0);
   }, [capsules]);
 
-  // Count capsules that have raw oversized tokens (> 1,200 tokens)
-  const oversizedCapsules = useMemo(() => {
-    return capsules.filter((c) => estimateTokenCount(c.content) > 1200);
-  }, [capsules]);
-
-  const [isCompressing, setIsCompressing] = useState(false);
-
-  const handleCompressLibrary = async () => {
-    if (oversizedCapsules.length === 0) {
-      showToast("Library is already optimized for ultra-low token utilization!", "info");
-      return;
-    }
-
-    setIsCompressing(true);
-    showToast(`Distilling ${oversizedCapsules.length} capsule(s) into ultra-low token format...`, "info");
-
-    try {
-      const res = await compressAllOversizedCapsules();
-      setIsCompressing(false);
-      if (res.compressedCount > 0) {
-        showToast(
-          `⚡ Saved ${res.savedTokens.toLocaleString()} tokens! Library reduced to ${formatTokenCount(res.newTotalTokens)}.`,
-          "success"
-        );
-      } else {
-        showToast("All capsules are already compressed.", "info");
-      }
-    } catch (err: any) {
-      setIsCompressing(false);
-      showToast(err?.message || "Compression failed", "error");
-    }
-  };
-
   // Keyboard shortcuts (Ctrl+N for new, Escape to dismiss)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -214,12 +181,9 @@ export default function SidePanel() {
         onNewCapsule={handleOpenNew}
         onOpenImportExport={() => setIsBackupModalOpen(true)}
         onCaptureCurrentTab={handleCaptureCurrentTab}
-        onCompressLibrary={handleCompressLibrary}
         isCapturing={isCapturing}
-        isCompressing={isCompressing}
         totalCapsules={capsules.length}
         totalTokens={totalTokens}
-        oversizedCount={oversizedCapsules.length}
       />
 
       {/* Search and Filters */}
@@ -228,33 +192,6 @@ export default function SidePanel() {
         folders={folders}
         onFilterChange={handleFilterChange}
       />
-
-      {/* Low-Token Optimization Banner if oversized capsules exist */}
-      {oversizedCapsules.length > 0 && (
-        <div className="mx-3 mt-2 mb-1 p-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-100/50 to-orange-50 border border-amber-300/80 flex items-center justify-between gap-2 shadow-2xs">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Zap className="w-3.5 h-3.5 fill-white" />
-            </div>
-            <div>
-              <p className="text-[11px] font-bold text-amber-950">
-                {oversizedCapsules.length} oversized capsule{oversizedCapsules.length > 1 ? "s" : ""} ({formatTokenCount(totalTokens)})
-              </p>
-              <p className="text-[10px] text-amber-800">
-                Compress to save ~90% tokens across AI platforms.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={handleCompressLibrary}
-            disabled={isCompressing}
-            className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white shadow-xs transition cursor-pointer"
-          >
-            <Zap className="w-3 h-3 fill-white" />
-            <span>{isCompressing ? "Compressing..." : "⚡ Compress Library"}</span>
-          </button>
-        </div>
-      )}
 
       {/* Main Capsule Library Feed */}
       <main className="flex-1 overflow-y-auto p-3 space-y-2.5">

@@ -1,5 +1,5 @@
 import type { CapsuleMessage, Capsule } from "../types";
-import { distillSmartCapsule } from "../utils/tokenOptimizer";
+import { buildStructuredContext } from "../utils/tokenOptimizer";
 
 export function extractGeminiChat(): Partial<Capsule> {
   const messages: CapsuleMessage[] = [];
@@ -46,20 +46,22 @@ export function extractGeminiChat(): Partial<Capsule> {
       ? `Gemini chat (${messages.length} messages). First prompt: ${messages[0]?.text.slice(0, 90)}...`
       : "Captured conversation from Gemini";
 
-  // Distill into ultra-low token Smart Capsule directly on capture (saving 80%-95% tokens)
-  const distilled = distillSmartCapsule(messages, {
+  // Format structured context with all turns preserved and conversational fluff stripped
+  const structured = buildStructuredContext(messages, {
+    formatMode: "xml",
     sourcePlatform: "Gemini",
     title,
-    summary
+    summary,
+    includeHandoff: true
   });
 
   return {
     title,
     summary,
-    content: distilled.optimized || (document.body.innerText?.slice(0, 2000) ?? ""),
+    content: structured.optimized || (document.body.innerText?.slice(0, 2000) ?? ""),
     messages,
     platform: "gemini",
     sourceUrl: window.location.href,
-    tags: ["gemini", "low-token-capsule"]
+    tags: ["gemini", "structured-context"]
   };
 }
