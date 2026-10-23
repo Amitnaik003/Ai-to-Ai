@@ -256,7 +256,7 @@ export default function SidePanel() {
 
       {/* Floating Toast Notification */}
       {toast && (
-        <div className="fixed bottom-4 left-4 right-4 z-50 flex justify-center pointer-events-none animate-in slide-in-from-bottom-2 fade-in duration-200">
+        <div className="fixed bottom-4 left-4 right-4 z-50 flex justify-center pointer-events-none animate-toast">
           <div
             className={`pointer-events-auto flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium shadow-lg border max-w-sm ${
               toast.type === "success"

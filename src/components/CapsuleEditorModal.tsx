@@ -332,17 +332,17 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
                     title="Transform into selected format to minimize tokens"
                   >
                     <Zap className="w-3 h-3" />
-                    <span>{selectedFormat === "smart_capsule" ? "⚡ Distill Smart Capsule" : "⚡ Structure & Sequence"}</span>
+                    <span>{selectedFormat === "smart_capsule" ? "⚡ Distill Smart Capsule" : "⚡ Format & Clean Sequence"}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleStructureAndSequence(selectedFormat, true)}
                     disabled={!content.trim()}
-                    title="Aggressive compression: tightly compresses line breaks and whitespace"
+                    title="Clean extra whitespace and formatting"
                     className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    <span>Max Compress</span>
+                    <span>Clean Whitespace</span>
                   </button>
                 </div>
               </div>

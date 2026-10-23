@@ -187,7 +187,7 @@ export default function FloatingCapsuleWidget() {
                   gap: "6px",
                   padding: "8px 12px",
                   borderRadius: "8px",
-                  background: "#10b981",
+                  background: "#4f46e5",
                   color: "#ffffff",
                   fontSize: "11px",
                   fontWeight: 600,
@@ -197,7 +197,7 @@ export default function FloatingCapsuleWidget() {
                 }}
               >
                 <Sparkles size={12} />
-                <span>Capture Low-Token Capsule</span>
+                <span>Capture Chat Context</span>
               </button>
 
               <button
@@ -226,7 +226,7 @@ export default function FloatingCapsuleWidget() {
       ) : (
         <button
           onClick={() => setIsOpen(true)}
-          title="Capsule Hub - Low-Token Context Transfer"
+          title="Capsule Hub - Context Transfer"
           style={{
             display: "flex",
             alignItems: "center",
@@ -234,9 +234,9 @@ export default function FloatingCapsuleWidget() {
             width: "42px",
             height: "42px",
             borderRadius: "50%",
-            background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+            background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
             color: "#ffffff",
-            boxShadow: "0 4px 14px 0 rgba(16, 185, 129, 0.4)",
+            boxShadow: "0 4px 16px 0 rgba(79, 70, 229, 0.45)",
             border: "2px solid #ffffff",
             cursor: "pointer",
             transition: "transform 0.2s, box-shadow 0.2s"

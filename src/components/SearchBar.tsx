@@ -13,7 +13,8 @@ const PLATFORM_OPTIONS: { id: "all" | PlatformType; label: string; badge: string
   { id: "chatgpt", label: "ChatGPT", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   { id: "claude", label: "Claude", badge: "bg-amber-50 text-amber-700 border-amber-200" },
   { id: "gemini", label: "Gemini", badge: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-  { id: "gmail", label: "Gmail", badge: "bg-rose-50 text-rose-700 border-rose-200" }
+  { id: "gmail", label: "Gmail", badge: "bg-rose-50 text-rose-700 border-rose-200" },
+  { id: "manual", label: "Custom", badge: "bg-slate-50 text-slate-700 border-slate-200" }
 ];
 
 export const SearchBar: React.FC<SearchBarProps> = ({
