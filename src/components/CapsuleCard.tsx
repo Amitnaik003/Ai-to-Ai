@@ -280,15 +280,14 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
   const handleDragStart = (e: React.DragEvent) => {
     setIsDragging(true);
     e.dataTransfer.setData("text/plain", activePayload);
-    e.dataTransfer.setData(
-      "application/x-capsule-hub",
-      JSON.stringify({
-        id: capsule.id,
-        title: capsule.title,
-        content: activePayload,
-        platform: capsule.platform
-      })
-    );
+    const payloadStr = JSON.stringify({
+      id: capsule.id,
+      title: capsule.title,
+      content: activePayload,
+      platform: capsule.platform
+    });
+    e.dataTransfer.setData("application/x-ai-to-ai", payloadStr);
+    e.dataTransfer.setData("application/x-capsule-hub", payloadStr);
     e.dataTransfer.effectAllowed = "copy";
   };
 

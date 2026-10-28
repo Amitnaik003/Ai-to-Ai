@@ -34,7 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div>
             <div className="flex items-center gap-1.5">
               <h1 className="text-xs font-extrabold text-slate-900 tracking-tight leading-none">
-                Capsule Hub
+                AI to AI
               </h1>
               <span className="text-[8px] font-bold uppercase tracking-wide px-1.5 py-0.2 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-2xs">
                 PRO

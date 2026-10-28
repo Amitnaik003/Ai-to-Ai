@@ -56,14 +56,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Support Drag-and-Drop injection from Sidepanel / Library
 if (typeof window !== "undefined") {
   window.addEventListener("dragover", (e) => {
-    if (e.dataTransfer?.types.includes("application/x-capsule-hub")) {
+    if (
+      e.dataTransfer?.types.includes("application/x-ai-to-ai") ||
+      e.dataTransfer?.types.includes("application/x-capsule-hub")
+    ) {
       e.preventDefault();
       e.dataTransfer.dropEffect = "copy";
     }
   });
 
   window.addEventListener("drop", (e) => {
-    const rawCapsule = e.dataTransfer?.getData("application/x-capsule-hub");
+    const rawCapsule =
+      e.dataTransfer?.getData("application/x-ai-to-ai") ||
+      e.dataTransfer?.getData("application/x-capsule-hub");
     const rawText = e.dataTransfer?.getData("text/plain");
     const textToInject = rawCapsule ? JSON.parse(rawCapsule).content : rawText;
 
@@ -172,7 +177,7 @@ export default function FloatingCapsuleWidget() {
               >
                 <Sparkles size={12} />
               </div>
-              <span style={{ fontSize: "12px", fontWeight: 700, color: "#0f172a" }}>Capsule Hub</span>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: "#0f172a" }}>AI to AI</span>
             </div>
             <button
               onClick={() => setIsOpen(false)}
@@ -253,7 +258,7 @@ export default function FloatingCapsuleWidget() {
       ) : (
         <button
           onClick={() => setIsOpen(true)}
-          title="Capsule Hub - Context Transfer"
+          title="AI to AI - Context Transfer"
           style={{
             display: "flex",
             alignItems: "center",
