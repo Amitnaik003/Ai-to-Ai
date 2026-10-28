@@ -72,7 +72,18 @@ if (typeof window !== "undefined") {
       e.dataTransfer?.getData("application/x-ai-to-ai") ||
       e.dataTransfer?.getData("application/x-capsule-hub");
     const rawText = e.dataTransfer?.getData("text/plain");
-    const textToInject = rawCapsule ? JSON.parse(rawCapsule).content : rawText;
+
+    let textToInject = rawText;
+    if (rawCapsule) {
+      try {
+        const parsed = JSON.parse(rawCapsule);
+        if (parsed && typeof parsed.content === "string") {
+          textToInject = parsed.content;
+        }
+      } catch {
+        textToInject = rawCapsule;
+      }
+    }
 
     if (textToInject) {
       e.preventDefault();

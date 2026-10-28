@@ -72,7 +72,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 
   if (info.menuItemId === "capsule-capture-page" && tab?.id) {
-    chrome.tabs.sendMessage(tab.id, { type: "TRIGGER_DOM_CAPTURE" }, async (response) => {
+    const tabId = tab.id;
+    chrome.tabs.sendMessage(tabId, { type: "TRIGGER_DOM_CAPTURE" }, async (response) => {
       if (chrome.runtime.lastError) {
         console.warn("Content script not ready or not matched:", chrome.runtime.lastError.message);
         return;
@@ -103,7 +104,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
           updatedAt: new Date().toISOString()
         });
         if (chrome.sidePanel?.open) {
-          chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
+          chrome.sidePanel.open({ tabId }).catch(() => {});
         }
       }
     });

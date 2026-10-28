@@ -91,18 +91,54 @@ export const CapsuleStore = {
   },
 
   async importJSON(jsonString: string): Promise<{ importedCount: number }> {
-    const data = JSON.parse(jsonString);
-    if (!data.capsules || !Array.isArray(data.capsules)) {
-      throw new Error("Invalid PromptWarp JSON format.");
+    let data: any;
+    try {
+      data = JSON.parse(jsonString);
+    } catch {
+      throw new Error("Invalid JSON format. Please verify your backup file.");
     }
+
+    if (!data || !Array.isArray(data.capsules)) {
+      throw new Error("Invalid PromptWarp JSON format. Missing capsules array.");
+    }
+
     const current = await this.getCapsules();
     const existingIds = new Set(current.map((c) => c.id));
 
-    const newItems = data.capsules.filter((c: Capsule) => !existingIds.has(c.id));
-    const merged = [...newItems, ...current];
+    const sanitizedNewItems: Capsule[] = [];
+    for (const raw of data.capsules) {
+      if (!raw || typeof raw !== "object") continue;
+      const id = typeof raw.id === "string" && raw.id.trim()
+        ? raw.id.trim()
+        : `cap-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      if (existingIds.has(id)) continue;
+
+      const safeCapsule: Capsule = {
+        id,
+        title: typeof raw.title === "string" ? raw.title.slice(0, 500) : "Imported Context",
+        summary: typeof raw.summary === "string" ? raw.summary.slice(0, 1000) : "",
+        content: typeof raw.content === "string" ? raw.content : "",
+        messages: Array.isArray(raw.messages)
+          ? raw.messages.filter((m: any) => m && typeof m.text === "string" && (m.role === "user" || m.role === "assistant" || m.role === "system"))
+          : undefined,
+        platform: typeof raw.platform === "string" ? (raw.platform as any) : "manual",
+        sourceUrl: typeof raw.sourceUrl === "string" ? raw.sourceUrl : undefined,
+        tags: Array.isArray(raw.tags)
+          ? raw.tags.filter((t: any) => typeof t === "string").map((t: string) => t.slice(0, 50))
+          : [],
+        isPinned: Boolean(raw.isPinned),
+        createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date().toISOString(),
+        updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date().toISOString()
+      };
+
+      sanitizedNewItems.push(safeCapsule);
+      existingIds.add(id);
+    }
+
+    const merged = [...sanitizedNewItems, ...current];
     await safeSet(CAPSULES_KEY, merged);
 
-    return { importedCount: newItems.length };
+    return { importedCount: sanitizedNewItems.length };
   }
 };
 
@@ -125,8 +161,8 @@ export function useCapsuleStore() {
   useEffect(() => {
     refresh();
 
-    const unwatchCapsules = storage.watch({
-      [CAPSULES_KEY]: (change) => {
+    const watchMap = {
+      [CAPSULES_KEY]: (change: any) => {
         if (change.newValue !== undefined) {
           const cleaned = Array.isArray(change.newValue)
             ? change.newValue.filter((c: Capsule) => !c.id?.startsWith("seed-"))
@@ -134,10 +170,12 @@ export function useCapsuleStore() {
           setCapsules(cleaned);
         }
       }
-    });
+    };
+
+    storage.watch(watchMap);
 
     return () => {
-      unwatchCapsules();
+      storage.unwatch(watchMap);
     };
   }, [refresh]);
 
