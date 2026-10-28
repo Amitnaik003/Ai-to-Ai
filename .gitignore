@@ -48,6 +48,12 @@ Thumbs.db
 *.sublime-project
 .vscode/*
 !.vscode/settings.json
+
+# Local environment wrappers
+powershell.bat
+powershell.cmd
+scripts/
+
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json

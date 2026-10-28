@@ -93,9 +93,6 @@ Browse to your project directory and select:
 4. Click **"Inject"** (or drag the grip handle directly into the prompt box).
 5. The prompt context is automatically transferred directly into the active prompt textarea with zero manual copy-pasting!
 
-### 4. Cook & Refine Prompts
-* Click **"Cook"** on any prompt to enhance it using recipes like *Chain-of-Thought*, *Role & Tone Calibration*, *Edge-Case Fortification*, or *Structured Schema*.
-
 ---
 
 ## 🛠️ Development & Building
@@ -132,8 +129,8 @@ npm run build
     ├── background.ts          # Background service worker (side panel & context menus)
     ├── sidepanel.tsx          # Main Side Panel React application
     ├── style.css              # Global styles & Tailwind directives
-    ├── types/                 # TypeScript interfaces (Capsule, Folder, Messages)
-    ├── storage/               # Chrome local storage manager with versioning
+    ├── types/                 # TypeScript interfaces (Capsule, Messages, Filters)
+    ├── storage/               # Chrome local storage manager with reactive sync
     ├── scrapers/              # DOM extraction for ChatGPT, Claude, Gemini, Perplexity, DeepSeek, Gmail
     ├── injector/              # Synthetic event input injection engine
     ├── contents/
@@ -141,7 +138,6 @@ npm run build
     ├── utils/
     │   ├── contextFormatter.ts# XML sequence builder, filler cleaner, turn stats
     │   ├── activeTab.ts       # Cross-tab dispatching utilities
-    │   ├── promptCooker.ts    # Prompt enhancement recipes
     │   └── favicon.ts         # Runtime favicon injector
-    └── components/            # React UI components (Editor, Card, Header, Search, Cook)
+    └── components/            # React UI components (Editor, Card, Header, Search, ImportExport)
 ```

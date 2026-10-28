@@ -8,16 +8,9 @@ import {
   ChevronUp,
   Edit2,
   Trash2,
-  History,
-  Clock,
-  Sparkles,
   MoreHorizontal,
   FileText,
   ListOrdered,
-  Flame,
-  Award,
-  GitFork,
-  RotateCcw,
   GripVertical,
   MessageSquare
 } from "lucide-react";
@@ -30,10 +23,6 @@ interface CapsuleCardProps {
   onEdit: (capsule: Capsule) => void;
   onDelete: (id: string) => void;
   onTogglePin: (id: string) => void;
-  onToggleGolden?: (id: string) => void;
-  onBranch?: (id: string) => void;
-  onRollback?: (capsuleId: string, version: number) => void;
-  onCookPrompt?: (capsule: Capsule) => void;
   onShowToast: (msg: string, type?: "success" | "error" | "info") => void;
   onUpdateCapsule?: (capsule: Capsule) => Promise<Capsule | void>;
 }
@@ -100,17 +89,11 @@ const PLATFORM_META: Record<
   }
 };
 
-type TransferMode = "formatted" | "raw";
-
 /* ─── Overflow Menu ────────────────────────────────────────────────────── */
 const OverflowMenu: React.FC<{
   onEdit: () => void;
   onDelete: () => void;
-  onBranch?: () => void;
-  onCook?: () => void;
-  onHistory: () => void;
-  hasHistory: boolean;
-}> = ({ onEdit, onDelete, onBranch, onCook, onHistory, hasHistory }) => {
+}> = ({ onEdit, onDelete }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -133,43 +116,13 @@ const OverflowMenu: React.FC<{
       </button>
 
       {open && (
-        <div className="absolute right-0 top-7 z-30 bg-white border border-slate-200 rounded-xl shadow-xl py-1 w-44 animate-fade-in text-xs">
-          {onCook && (
-            <button
-              onClick={() => { onCook(); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-amber-700 hover:bg-amber-50 font-medium transition"
-            >
-              <Flame className="w-3.5 h-3.5 text-amber-600" />
-              <span>Cook This Prompt</span>
-            </button>
-          )}
-
-          {onBranch && (
-            <button
-              onClick={() => { onBranch(); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-slate-50 font-medium transition"
-            >
-              <GitFork className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Branch (Fork Context)</span>
-            </button>
-          )}
-
-          {hasHistory && (
-            <button
-              onClick={() => { onHistory(); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition"
-            >
-              <History className="w-3.5 h-3.5" />
-              <span>Version History</span>
-            </button>
-          )}
-
+        <div className="absolute right-0 top-7 z-30 bg-white border border-slate-200 rounded-xl shadow-xl py-1 w-36 animate-fade-in text-xs">
           <button
             onClick={() => { onEdit(); setOpen(false); }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
           >
             <Edit2 className="w-3.5 h-3.5" />
-            <span>Edit Capsule</span>
+            <span>Edit</span>
           </button>
 
           <div className="my-1 border-t border-slate-100" />
@@ -193,90 +146,68 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
   onEdit,
   onDelete,
   onTogglePin,
-  onToggleGolden,
-  onBranch,
-  onRollback,
-  onCookPrompt,
-  onShowToast,
-  onUpdateCapsule
+  onShowToast
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [isInjecting, setIsInjecting] = useState(false);
-  const [injectSuccess, setInjectSuccess] = useState(false);
-  const [transferMode, setTransferMode] = useState<TransferMode>("formatted");
-  const [previewTab, setPreviewTab] = useState<TransferMode>("formatted");
+  const [injecting, setInjecting] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
   const meta = PLATFORM_META[capsule.platform] || PLATFORM_META.manual;
 
-  // Clean structured context preserving all conversation turns
+  // Turn metrics
   const stats = useMemo(
     () => getConversationStats(capsule.messages || capsule.content),
     [capsule.messages, capsule.content]
   );
 
-  const structuredSequence = useMemo(
-    () =>
-      buildStructuredContext(capsule.messages || capsule.content, {
-        formatMode: "xml",
-        sourcePlatform: capsule.platform.toUpperCase(),
-        title: capsule.title,
-        summary: capsule.summary,
-        includeHandoff: true
-      }),
-    [capsule]
-  );
+  // Structured XML sequence
+  const structuredSequence = useMemo(() => {
+    const res = buildStructuredContext(capsule.messages || capsule.content, {
+      formatMode: "xml",
+      sourcePlatform: capsule.platform.toUpperCase(),
+      title: capsule.title,
+      summary: capsule.summary,
+      includeHandoff: true
+    });
+    return res.optimized;
+  }, [capsule]);
 
   const activePayload = useMemo(() => {
-    if (transferMode === "formatted") return structuredSequence.optimized;
-    return capsule.content;
-  }, [transferMode, structuredSequence, capsule.content]);
+    return structuredSequence || capsule.content;
+  }, [structuredSequence, capsule.content]);
 
-  const previewPayload = useMemo(() => {
-    if (previewTab === "formatted") return structuredSequence.optimized;
-    return capsule.content;
-  }, [previewTab, structuredSequence, capsule.content]);
-
-  // ── Handlers ───────────────────────────────────────────────────────
+  // Copy to clipboard
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(activePayload);
       setCopied(true);
-      onShowToast(
-        transferMode === "formatted"
-          ? "Structured context sequence copied!"
-          : "Raw context copied!",
-        "success"
-      );
+      onShowToast("Context copied to clipboard!", "success");
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      onShowToast("Failed to copy to clipboard", "error");
+      onShowToast("Failed to copy context", "error");
     }
   };
 
+  // Direct injection into destination LLM tab
   const handleInject = async () => {
-    setIsInjecting(true);
-    setInjectSuccess(false);
-    const result = await injectCapsuleIntoActiveTab(activePayload);
-    setIsInjecting(false);
-
-    if (result.success) {
-      setInjectSuccess(true);
-      onShowToast(
-        transferMode === "formatted"
-          ? "Structured sequence injected into chat! 🚀"
-          : "Raw context injected! 🚀",
-        "success"
-      );
-      setTimeout(() => setInjectSuccess(false), 2500);
-    } else {
-      onShowToast(result.error || "Could not inject into page", "error");
+    setInjecting(true);
+    try {
+      const result = await injectCapsuleIntoActiveTab(activePayload);
+      if (result.success) {
+        onShowToast("Context transferred directly into active prompt!", "success");
+      } else {
+        onShowToast(result.error || "Injection target unavailable. Copying to clipboard instead.", "error");
+        await navigator.clipboard.writeText(activePayload);
+      }
+    } catch (err: any) {
+      onShowToast(err.message || "Failed to inject context", "error");
+    } finally {
+      setInjecting(false);
     }
   };
 
-  // ── Drag and Drop Support (Tilantra Feature) ────────────────────────
+  // HTML5 Drag and Drop context transfer
   const handleDragStart = (e: React.DragEvent) => {
     setIsDragging(true);
     e.dataTransfer.setData("text/plain", activePayload);
@@ -297,337 +228,162 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
   };
 
   return (
-    <div
+    <article
       draggable
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      className={`group relative card-glass rounded-xl border transition-all duration-200 overflow-hidden
-        ${meta.stripe}
-        ${capsule.isGolden ? "golden-card-glow border-amber-300/80 bg-amber-50/15" : ""}
-        ${
-          capsule.isPinned && !capsule.isGolden
-            ? "border-amber-200 shadow-md shadow-amber-100/60"
-            : "border-slate-200/90 hover:border-slate-300 hover:shadow-md hover:shadow-slate-200/70"
-        }
-        ${isDragging ? "opacity-60 scale-[0.98] ring-2 ring-indigo-400" : ""}
-        animate-card
-      `}
+      className={`group relative bg-white rounded-xl border border-slate-200/90 shadow-2xs hover:shadow-md transition-all overflow-hidden ${
+        capsule.isPinned ? "bg-amber-50/10 border-amber-200/70" : ""
+      } ${isDragging ? "opacity-40 scale-[0.99] border-dashed border-indigo-400" : ""}`}
     >
-      {/* ── Top row: badges + controls ──────────────────────────────── */}
-      <div className="flex items-start justify-between gap-1.5 px-3 pt-2.5 pb-0">
-        {/* Left: Drag Handle + Platform badge + version + date */}
-        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-          {/* Drag Handle Indicator */}
-          <span
-            title="Drag & drop this capsule directly into any AI chat input"
-            className="text-slate-300 group-hover:text-slate-500 cursor-grab active:cursor-grabbing p-0.5"
-          >
-            <GripVertical className="w-3.5 h-3.5" />
-          </span>
+      {/* Platform color stripe */}
+      <div className={`h-0.5 w-full ${meta.stripe}`} />
 
-          {/* Platform pill */}
-          <span
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${meta.badge}`}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
-            {meta.label}
-          </span>
-
-          {/* Conversation Messages Count in Entire Chat */}
-          <span
-            title={stats.detailedLabel}
-            className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50/90 text-indigo-700 border border-indigo-200/60"
-          >
-            <MessageSquare className="w-2.5 h-2.5 fill-indigo-600 text-indigo-600 shrink-0" />
-            <span>{stats.label}</span>
-          </span>
-
-          {/* Golden Prompt Badge if active */}
-          {capsule.isGolden && (
-            <span
-              title="Tilantra Golden Prompt Standard"
-              className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-md golden-badge border"
+      {/* Card Header */}
+      <div className="p-3 pb-2">
+        <div className="flex items-center justify-between gap-1 mb-1.5">
+          {/* Left: Drag Handle + Platform Badge + Turns Count */}
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+            {/* Drag Handle */}
+            <div
+              title="Drag & drop this context directly into any AI chat input"
+              className="p-0.5 -ml-1 text-slate-300 hover:text-indigo-600 cursor-grab active:cursor-grabbing transition"
             >
-              <Award className="w-2.5 h-2.5 fill-amber-500 text-amber-700" />
-              Golden
+              <GripVertical className="w-3.5 h-3.5" />
+            </div>
+
+            {/* Platform pill */}
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${meta.badge}`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+              {meta.label}
             </span>
-          )}
 
-          {/* Version */}
-          {capsule.version > 1 && (
-            <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
-              v{capsule.version}
+            {/* Turn Counter Badge */}
+            <span
+              title={`Dialogue turns: ${stats.totalMessages} turns (${stats.userMessages} user · ${stats.assistantMessages} AI)`}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200/60"
+            >
+              <MessageSquare className="w-2.5 h-2.5 text-slate-500" />
+              <span>{stats.label}</span>
             </span>
-          )}
+          </div>
 
-          {/* Date */}
-          <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-            <Clock className="w-2.5 h-2.5 shrink-0" />
-            {new Date(capsule.updatedAt).toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric"
-            })}
-          </span>
-        </div>
-
-        {/* Right: Golden star + Pin + overflow menu + expand */}
-        <div className="flex items-center gap-0.5 shrink-0">
-          {/* Golden Prompt Toggle */}
-          {onToggleGolden && (
+          {/* Right: Pin & Overflow Menu */}
+          <div className="flex items-center gap-0.5 shrink-0">
+            {/* Pin */}
             <button
-              onClick={() => onToggleGolden(capsule.id)}
-              title={capsule.isGolden ? "Remove Golden Prompt status" : "Mark as Golden Prompt"}
+              onClick={() => onTogglePin(capsule.id)}
+              title={capsule.isPinned ? "Unpin" : "Pin to top"}
               className={`p-1 rounded-md transition cursor-pointer ${
-                capsule.isGolden
-                  ? "text-amber-500 bg-amber-100/70"
-                  : "text-slate-300 hover:text-amber-500 hover:bg-amber-50"
+                capsule.isPinned
+                  ? "text-amber-500 bg-amber-50 hover:bg-amber-100"
+                  : "text-slate-300 hover:text-amber-500 hover:bg-slate-100"
               }`}
             >
-              <Award className={`w-3.5 h-3.5 ${capsule.isGolden ? "fill-amber-500" : ""}`} />
+              <Pin className={`w-3.5 h-3.5 ${capsule.isPinned ? "fill-amber-500" : ""}`} />
             </button>
-          )}
 
-          {/* Pin Toggle */}
-          <button
-            onClick={() => onTogglePin(capsule.id)}
-            title={capsule.isPinned ? "Unpin" : "Pin to top"}
-            className={`p-1 rounded-md transition cursor-pointer ${
-              capsule.isPinned
-                ? "text-amber-500 bg-amber-50"
-                : "text-slate-300 hover:text-amber-400 hover:bg-amber-50"
-            }`}
-          >
-            <Pin className={`w-3.5 h-3.5 ${capsule.isPinned ? "fill-amber-500" : ""}`} />
-          </button>
-
-          {/* Overflow Menu with Branch & Cook */}
-          <OverflowMenu
-            onEdit={() => onEdit(capsule)}
-            onDelete={() => onDelete(capsule.id)}
-            onBranch={onBranch ? () => onBranch(capsule.id) : undefined}
-            onCook={onCookPrompt ? () => onCookPrompt(capsule) : undefined}
-            onHistory={() => {
-              setIsExpanded(true);
-              setShowHistory((v) => !v);
-            }}
-            hasHistory={!!(capsule.history && capsule.history.length > 0)}
-          />
-
-          {/* Expand/Collapse */}
-          <button
-            onClick={() => setIsExpanded((v) => !v)}
-            title={isExpanded ? "Collapse" : "Expand preview"}
-            className="p-1 rounded-md text-slate-300 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-          >
-            {isExpanded ? (
-              <ChevronUp className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            )}
-          </button>
+            {/* Overflow */}
+            <OverflowMenu
+              onEdit={() => onEdit(capsule)}
+              onDelete={() => onDelete(capsule.id)}
+            />
+          </div>
         </div>
-      </div>
 
-      {/* ── Branch lineage pill if branched ─────────────────────────── */}
-      {capsule.branchedFrom && (
-        <div className="px-3 pt-1">
-          <span className="inline-flex items-center gap-1 text-[9px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
-            <GitFork className="w-2.5 h-2.5" />
-            <span>Forked from: {capsule.branchedFrom.title.slice(0, 30)} (v{capsule.branchedFrom.version})</span>
-          </span>
-        </div>
-      )}
-
-      {/* ── Title + Summary ─────────────────────────────────────────── */}
-      <div className="px-3 pt-1.5 pb-1">
-        <h3 className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition-colors leading-snug line-clamp-1">
+        {/* Title */}
+        <h2 className="text-xs font-bold text-slate-900 leading-snug line-clamp-2 mt-1">
           {capsule.title}
-        </h3>
+        </h2>
 
+        {/* Summary */}
         {capsule.summary && (
-          <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">
+          <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5 leading-relaxed">
             {capsule.summary}
           </p>
         )}
 
         {/* Tags */}
         {capsule.tags && capsule.tags.length > 0 && (
-          <div className="flex items-center gap-1 flex-wrap mt-1.5">
-            {capsule.tags.slice(0, 5).map((tag) => (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {capsule.tags.slice(0, 4).map((tag) => (
               <span
                 key={tag}
-                className={`inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-md ${meta.tagClass}`}
+                className="text-[9px] px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 font-medium"
               >
                 #{tag}
               </span>
             ))}
-            {capsule.tags.length > 5 && (
-              <span className="text-[9px] text-slate-400 font-medium">
-                +{capsule.tags.length - 5}
-              </span>
-            )}
           </div>
         )}
       </div>
 
-      {/* ── Expanded Preview ────────────────────────────────────────── */}
-      {isExpanded && (
-        <div className="mx-3 mb-2 mt-1 rounded-xl overflow-hidden border border-slate-200/80 bg-slate-50 animate-fade-in">
-          {/* Preview tab strip */}
-          <div className="flex items-center justify-between px-2 py-1.5 border-b border-slate-200/70 bg-white/70">
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg gap-px">
-              <button
-                onClick={() => setPreviewTab("formatted")}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition cursor-pointer ${
-                  previewTab === "formatted"
-                    ? "bg-white text-indigo-700 shadow-sm"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                <ListOrdered className="w-3 h-3" />
-                Formatted
-              </button>
-              <button
-                onClick={() => setPreviewTab("raw")}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition cursor-pointer ${
-                  previewTab === "raw"
-                    ? "bg-white text-slate-800 shadow-sm"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                <FileText className="w-3 h-3" />
-                Raw Text
-              </button>
-            </div>
-
-            <span className="text-[10px] text-slate-500 font-medium pr-1 flex items-center gap-1">
-              <MessageSquare className="w-3 h-3 text-indigo-500" />
-              <span>{stats.totalMessages} conversation {stats.totalMessages === 1 ? "turn" : "turns"}</span>
-              <span>·</span>
-              <span className="font-mono text-slate-400">{capsule.content.length} chars</span>
+      {/* Expanded Turn Preview */}
+      {expanded && (
+        <div className="border-t border-slate-100 bg-slate-50/70 p-2.5 animate-fade-in text-xs space-y-2">
+          <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold px-0.5">
+            <span className="flex items-center gap-1">
+              <ListOrdered className="w-3 h-3 text-indigo-500" />
+              <span>{stats.totalMessages} Turns Sequence</span>
+            </span>
+            <span className="text-[10px] text-slate-400">
+              {activePayload.length.toLocaleString()} chars
             </span>
           </div>
 
-          {/* Preview body */}
-          <div className="p-2.5 text-[11px] font-mono leading-relaxed text-slate-700 max-h-48 overflow-y-auto whitespace-pre-wrap select-text">
-            {previewPayload}
-          </div>
-
-          {/* History pane with Version Rollback (Tilantra feature) */}
-          {showHistory && capsule.history && capsule.history.length > 0 && (
-            <div className="border-t border-slate-200/70 px-2.5 py-2 space-y-1.5 max-h-40 overflow-y-auto bg-white/70">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-[10px] font-bold text-slate-700">
-                  Version History ({capsule.history.length} revisions)
-                </p>
-                <span className="text-[9px] text-slate-400">Click rollback to restore</span>
-              </div>
-              {capsule.history.map((rev) => (
-                <div
-                  key={rev.version}
-                  className="p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] flex items-start justify-between gap-2"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 text-slate-500 font-semibold mb-0.5">
-                      <span className="text-indigo-600 font-bold">v{rev.version}</span>
-                      <span>·</span>
-                      <span>{new Date(rev.updatedAt).toLocaleString()}</span>
-                    </div>
-                    <p className="text-slate-700 line-clamp-1 leading-snug">
-                      {rev.summary || rev.content}
-                    </p>
-                  </div>
-
-                  {onRollback && (
-                    <button
-                      onClick={() => onRollback(capsule.id, rev.version)}
-                      title={`Restore version v${rev.version}`}
-                      className="inline-flex items-center gap-0.5 px-1.5 py-1 text-[9px] font-semibold text-slate-600 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 rounded shrink-0 transition cursor-pointer"
-                    >
-                      <RotateCcw className="w-2.5 h-2.5" />
-                      <span>Rollback</span>
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+          <pre className="p-2 bg-white rounded-lg border border-slate-200 text-[10px] text-slate-700 font-mono whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+            {activePayload}
+          </pre>
         </div>
       )}
 
-      {/* ── Bottom action bar ───────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-3 pb-2.5 pt-1.5 gap-2">
-        {/* Left: Inject + Copy + Cook This Prompt */}
+      {/* Card Actions Footer */}
+      <div className="flex items-center justify-between px-3 py-2 bg-slate-50/50 border-t border-slate-100 text-xs">
+        {/* Left: Expand Preview Toggle */}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-indigo-600 font-medium transition cursor-pointer"
+        >
+          <FileText className="w-3 h-3 text-slate-400" />
+          <span>{expanded ? "Hide Preview" : "Preview"}</span>
+          {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+        </button>
+
+        {/* Right: Copy & Inject Actions */}
         <div className="flex items-center gap-1.5">
-          {/* Inject — primary CTA */}
+          {/* Copy Button */}
           <button
-            onClick={handleInject}
-            disabled={isInjecting}
-            className={`btn-inject flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white transition-all cursor-pointer ${
-              injectSuccess ? "!bg-emerald-500 !bg-none" : isInjecting ? "opacity-70 cursor-wait" : ""
-            }`}
-            title="Inject context into active chat input"
+            onClick={handleCopy}
+            title="Copy formatted context"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition cursor-pointer"
           >
-            {injectSuccess ? (
-              <><Check className="w-3.5 h-3.5" /><span>Injected!</span></>
-            ) : isInjecting ? (
-              <><Sparkles className="w-3.5 h-3.5 animate-spin" /><span>Injecting…</span></>
+            {copied ? (
+              <>
+                <Check className="w-3 h-3 text-emerald-600" />
+                <span className="text-emerald-700">Copied</span>
+              </>
             ) : (
-              <><Send className="w-3.5 h-3.5" /><span>Inject</span></>
+              <>
+                <Copy className="w-3 h-3 text-slate-500" />
+                <span>Copy</span>
+              </>
             )}
           </button>
 
-          {/* Copy */}
+          {/* Inject Button */}
           <button
-            onClick={handleCopy}
-            title="Copy to clipboard"
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer border border-slate-200"
+            onClick={handleInject}
+            disabled={injecting}
+            title="Inject directly into active browser tab"
+            className="flex items-center gap-1 px-3 py-1 rounded-lg text-[11px] font-bold bg-indigo-600 hover:bg-indigo-700 active:scale-[0.97] text-white shadow-xs transition-all cursor-pointer disabled:opacity-50"
           >
-            {copied
-              ? <Check className="w-3.5 h-3.5 text-emerald-600" />
-              : <Copy className="w-3.5 h-3.5" />}
-            <span>{copied ? "Copied" : "Copy"}</span>
-          </button>
-
-          {/* Cook Prompt Button (Tilantra signature) */}
-          {onCookPrompt && (
-            <button
-              onClick={() => onCookPrompt(capsule)}
-              title="Cook This Prompt: enhance, benchmark and structure"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 transition cursor-pointer border border-amber-200"
-            >
-              <Flame className="w-3.5 h-3.5 text-amber-600" />
-              <span className="hidden sm:inline">Cook</span>
-            </button>
-          )}
-        </div>
-
-        {/* Right: Transfer mode selector: Formatted vs Raw */}
-        <div className="flex items-center bg-slate-100 border border-slate-200/80 p-0.5 rounded-lg gap-px">
-          <button
-            onClick={() => setTransferMode("formatted")}
-            title="Formatted Sequence: all turns in chronological order"
-            className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition cursor-pointer ${
-              transferMode === "formatted"
-                ? "bg-white shadow-sm text-indigo-700"
-                : "text-slate-400 hover:text-slate-700"
-            }`}
-          >
-            Formatted
-          </button>
-          <button
-            onClick={() => setTransferMode("raw")}
-            title="Raw: original untouched text"
-            className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition cursor-pointer ${
-              transferMode === "raw"
-                ? "bg-white shadow-sm text-slate-800"
-                : "text-slate-400 hover:text-slate-700"
-            }`}
-          >
-            Raw
+            <Send className="w-3 h-3" />
+            <span>{injecting ? "Injecting…" : "Inject"}</span>
           </button>
         </div>
       </div>
-    </div>
+    </article>
   );
 };

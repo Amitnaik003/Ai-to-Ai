@@ -62,7 +62,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       sourceUrl: tab?.url,
       tags: ["quick-capture", platform],
       isPinned: false,
-      version: 1,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
@@ -100,7 +99,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
           sourceUrl: tab.url,
           tags: [platform, "structured-context"],
           isPinned: false,
-          version: 1,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         });

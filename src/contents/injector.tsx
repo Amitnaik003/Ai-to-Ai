@@ -118,7 +118,6 @@ export default function FloatingCapsuleWidget() {
         sourceUrl: window.location.href,
         tags: [platform, "structured-context"],
         isPinned: false,
-        version: 1,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });

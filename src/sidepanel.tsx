@@ -6,12 +6,11 @@ import { SearchBar } from "./components/SearchBar";
 import { CapsuleCard } from "./components/CapsuleCard";
 import { CapsuleEditorModal } from "./components/CapsuleEditorModal";
 import { ImportExportModal } from "./components/ImportExportModal";
-import { CookPromptModal } from "./components/CookPromptModal";
 import { triggerActiveTabCapture } from "./utils/activeTab";
 import { buildStructuredContext, getConversationStats } from "./utils/contextFormatter";
 import { setSidepanelFavicon } from "./utils/favicon";
 import type { Capsule, CapsuleFilter } from "./types";
-import { Sparkles, Inbox, Plus, AlertCircle, CheckCircle2, Info, BookOpen, Zap, Flame } from "lucide-react";
+import { Sparkles, Inbox, Plus, AlertCircle, CheckCircle2, Info } from "lucide-react";
 
 interface ToastState {
   id: number;
@@ -22,27 +21,19 @@ interface ToastState {
 export default function SidePanel() {
   const {
     capsules,
-    folders,
     loading,
     saveCapsule,
     deleteCapsule,
     clearAll,
-    loadSample,
     togglePin,
-    toggleGolden,
-    branchCapsule,
-    rollbackVersion,
     exportJSON,
-    importJSON,
-    compressAllOversizedCapsules
+    importJSON
   } = useCapsuleStore();
 
   const [filter, setFilter] = useState<CapsuleFilter>({
     search: "",
     platform: "all",
-    folderId: "all",
-    pinnedOnly: false,
-    goldenOnly: false
+    pinnedOnly: false
   });
 
   const [editingCapsule, setEditingCapsule] = useState<Capsule | null>(null);
@@ -50,10 +41,6 @@ export default function SidePanel() {
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
-
-  // Cook This Prompt Modal State (Tilantra feature)
-  const [cookingCapsule, setCookingCapsule] = useState<Capsule | null>(null);
-  const [isCookModalOpen, setIsCookModalOpen] = useState(false);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
     const id = Date.now();
@@ -91,7 +78,6 @@ export default function SidePanel() {
       if (e.key === "Escape") {
         setIsEditorOpen(false);
         setIsBackupModalOpen(false);
-        setIsCookModalOpen(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -106,18 +92,8 @@ export default function SidePanel() {
           return false;
         }
 
-        // Folder filter
-        if (filter.folderId !== "all" && cap.folderId !== filter.folderId) {
-          return false;
-        }
-
         // Pinned only
         if (filter.pinnedOnly && !cap.isPinned) {
-          return false;
-        }
-
-        // Golden only (Tilantra Golden Prompts)
-        if (filter.goldenOnly && !cap.isGolden) {
           return false;
         }
 
@@ -139,9 +115,6 @@ export default function SidePanel() {
         // Pinned capsules always float to top
         if (a.isPinned && !b.isPinned) return -1;
         if (!a.isPinned && b.isPinned) return 1;
-        // Then Golden Prompts float above standard capsules
-        if (a.isGolden && !b.isGolden) return -1;
-        if (!a.isGolden && b.isGolden) return 1;
         // Then sort by most recently updated
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       });
@@ -174,12 +147,10 @@ export default function SidePanel() {
           messages: result.capsule.messages,
           platform: result.capsule.platform || "other",
           sourceUrl: result.capsule.sourceUrl,
-          tags: result.capsule.tags || ["auto-capture", "structured-context"],
+          tags: result.capsule.tags || ["auto-capture"],
           isPinned: false,
-          version: 1,
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          history: []
+          updatedAt: new Date().toISOString()
         };
         const saved = await saveCapsule(newCap);
         showToast(`Captured: "${saved.title.slice(0, 24)}"`, "success");
@@ -202,60 +173,6 @@ export default function SidePanel() {
     setIsEditorOpen(true);
   };
 
-  // Branch a capsule into an independent fork
-  const handleBranch = async (id: string) => {
-    try {
-      const branched = await branchCapsule(id);
-      showToast(`Branched: "${branched.title.slice(0, 24)}" 🌿`, "success");
-    } catch (err: any) {
-      showToast(err?.message || "Failed to branch capsule", "error");
-    }
-  };
-
-  // Rollback capsule version
-  const handleRollback = async (capsuleId: string, version: number) => {
-    try {
-      const restored = await rollbackVersion(capsuleId, version);
-      if (restored) {
-        showToast(`Rolled back to v${version} (now v${restored.version})! ⏱️`, "success");
-      }
-    } catch (err: any) {
-      showToast(err?.message || "Rollback failed", "error");
-    }
-  };
-
-  // Toggle Golden Prompt status
-  const handleToggleGolden = async (id: string) => {
-    await toggleGolden(id);
-    const cap = capsules.find((c) => c.id === id);
-    const isNowGolden = !cap?.isGolden;
-    showToast(isNowGolden ? "Marked as Golden Prompt! 🏆" : "Unmarked Golden Prompt", "info");
-  };
-
-  // Open "Cook This Prompt" modal
-  const handleOpenCook = (capsule: Capsule | null) => {
-    setCookingCapsule(capsule);
-    setIsCookModalOpen(true);
-  };
-
-  // Save Cooked Prompt as a new Golden Capsule
-  const handleSaveCookedGolden = async (title: string, content: string) => {
-    const newCap: Capsule = {
-      id: `cap-golden-${Date.now()}`,
-      title,
-      summary: "Cooked Golden Prompt with frontier LLM benchmarks",
-      content,
-      platform: cookingCapsule?.platform || "manual",
-      tags: ["golden-prompt", "cooked", "benchmark"],
-      isPinned: false,
-      isGolden: true,
-      version: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    await saveCapsule(newCap);
-  };
-
   return (
     <div className="flex flex-col h-screen w-full bg-mesh text-slate-800 antialiased overflow-hidden select-none font-sans">
       {/* Header */}
@@ -263,7 +180,6 @@ export default function SidePanel() {
         onNewCapsule={handleOpenNew}
         onOpenImportExport={() => setIsBackupModalOpen(true)}
         onCaptureCurrentTab={handleCaptureCurrentTab}
-        onOpenCookPrompt={() => handleOpenCook(null)}
         isCapturing={isCapturing}
         totalCapsules={capsules.length}
         totalMessages={totalMessages}
@@ -272,18 +188,17 @@ export default function SidePanel() {
       {/* Search and Filters */}
       <SearchBar
         filter={filter}
-        folders={folders}
         onFilterChange={handleFilterChange}
       />
 
-      {/* Main Capsule Library Feed */}
+      {/* Main Context Library Feed */}
       <main className="flex-1 overflow-y-auto p-3 space-y-2">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
             <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
               <Sparkles className="w-5 h-5 animate-spin text-indigo-500" />
             </div>
-            <p className="text-xs font-medium">Loading your capsules…</p>
+            <p className="text-xs font-medium">Loading contexts…</p>
           </div>
         ) : filteredCapsules.length > 0 ? (
           filteredCapsules.map((cap) => (
@@ -293,60 +208,35 @@ export default function SidePanel() {
               onEdit={handleEdit}
               onDelete={deleteCapsule}
               onTogglePin={togglePin}
-              onToggleGolden={handleToggleGolden}
-              onBranch={handleBranch}
-              onRollback={handleRollback}
-              onCookPrompt={handleOpenCook}
               onShowToast={showToast}
               onUpdateCapsule={saveCapsule}
             />
           ))
         ) : (
-          /* ── Premium empty state ─────────────────────────────────── */
-          <div className="flex flex-col items-center justify-center py-14 px-5 text-center">
-            {/* Layered icon */}
-            <div className="relative mb-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center border border-indigo-200/60 shadow-lg shadow-indigo-100">
-                <Inbox className="w-7 h-7 text-indigo-400" />
-              </div>
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center shadow-sm">
-                <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
-              </div>
+          /* Empty state */
+          <div className="flex flex-col items-center justify-center py-16 px-5 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-3 text-indigo-500">
+              <Inbox className="w-7 h-7" />
             </div>
 
             <h3 className="text-sm font-bold text-slate-800">
-              {filter.search || filter.platform !== "all" || filter.pinnedOnly || filter.goldenOnly
-                ? "No capsules found"
-                : "Start your context library"}
+              {filter.search || filter.platform !== "all" || filter.pinnedOnly
+                ? "No contexts found"
+                : "No saved contexts yet"}
             </h3>
-            <p className="text-[11px] text-slate-500 mt-1.5 max-w-[220px] leading-relaxed">
-              {filter.search || filter.platform !== "all" || filter.pinnedOnly || filter.goldenOnly
-                ? "Clear your filters or search to see all capsules."
-                : "Capture chats from ChatGPT, Claude, Gemini, Perplexity, DeepSeek or Gmail — then drag or inject them anywhere."}
+            <p className="text-[11px] text-slate-500 mt-1 max-w-[220px] leading-relaxed">
+              {filter.search || filter.platform !== "all" || filter.pinnedOnly
+                ? "Try clearing your search query or platform filter."
+                : "Capture conversations from ChatGPT, Claude, Gemini, Perplexity, DeepSeek or Gmail, or create a new prompt."}
             </p>
 
-            <div className="flex flex-col items-center gap-2 mt-5">
-              <button
-                onClick={handleOpenNew}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 active:scale-[0.97] text-white shadow-md shadow-indigo-200 transition-all cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
-                <span>Create New Capsule</span>
-              </button>
-
-              {capsules.length === 0 && !filter.search && (
-                <button
-                  onClick={async () => {
-                    await loadSample();
-                    showToast("Sample architect prompt added!", "success");
-                  }}
-                  className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-indigo-600 transition cursor-pointer pt-0.5"
-                >
-                  <BookOpen className="w-3 h-3" />
-                  <span>Load example prompt</span>
-                </button>
-              )}
-            </div>
+            <button
+              onClick={handleOpenNew}
+              className="mt-4 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 active:scale-[0.97] text-white shadow-md shadow-indigo-200 transition-all cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
+              <span>Create New Context</span>
+            </button>
           </div>
         )}
       </main>
@@ -375,35 +265,14 @@ export default function SidePanel() {
         </div>
       )}
 
-      {/* "Cook This Prompt" Modal (Tilantra feature) */}
-      <CookPromptModal
-        isOpen={isCookModalOpen}
-        onClose={() => setIsCookModalOpen(false)}
-        initialText={cookingCapsule ? cookingCapsule.content : ""}
-        capsuleTitle={cookingCapsule ? cookingCapsule.title : "Custom Prompt"}
-        sourceCapsule={cookingCapsule}
-        onApplyCookedText={(cookedText) => {
-          if (cookingCapsule) {
-            saveCapsule({
-              ...cookingCapsule,
-              content: cookedText,
-              updatedAt: new Date().toISOString()
-            });
-          }
-        }}
-        onSaveAsGoldenCapsule={handleSaveCookedGolden}
-        onShowToast={showToast}
-      />
-
       {/* Editor Modal */}
       <CapsuleEditorModal
         capsule={editingCapsule}
-        folders={folders}
         isOpen={isEditorOpen}
         onClose={() => setIsEditorOpen(false)}
         onSave={async (cap) => {
           await saveCapsule(cap);
-          showToast(editingCapsule ? "Capsule updated!" : "Capsule created!", "success");
+          showToast(editingCapsule ? "Context updated!" : "Context saved!", "success");
         }}
       />
 
@@ -412,7 +281,6 @@ export default function SidePanel() {
         isOpen={isBackupModalOpen}
         onClose={() => setIsBackupModalOpen(false)}
         capsules={capsules}
-        folders={folders}
         onExport={exportJSON}
         onImport={importJSON}
         onClearAll={clearAll}

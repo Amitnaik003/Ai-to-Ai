@@ -14,14 +14,6 @@ export interface CapsuleMessage {
   timestamp?: string;
 }
 
-export interface CapsuleVersion {
-  version: number;
-  updatedAt: string;
-  title: string;
-  content: string;
-  summary: string;
-}
-
 export interface Capsule {
   id: string;
   title: string;
@@ -30,34 +22,16 @@ export interface Capsule {
   messages?: CapsuleMessage[];
   platform: PlatformType;
   sourceUrl?: string;
-  folderId?: string;
   tags: string[];
   isPinned: boolean;
-  isGolden?: boolean; // Tilantra Golden Prompt standard
-  branchedFrom?: {
-    id: string;
-    version: number;
-    title: string;
-  };
-  version: number;
-  history?: CapsuleVersion[];
   createdAt: string;
   updatedAt: string;
-}
-
-export interface Folder {
-  id: string;
-  name: string;
-  color: string;
-  createdAt: string;
 }
 
 export interface CapsuleFilter {
   search: string;
   platform: 'all' | PlatformType;
-  folderId: string | 'all';
   pinnedOnly: boolean;
-  goldenOnly?: boolean;
 }
 
 export type ExtensionMessage =

@@ -1,11 +1,10 @@
 import React from "react";
-import { Plus, Sparkles, Database, Cpu, Flame, MessageSquare } from "lucide-react";
+import { Plus, Sparkles, Database, Cpu, MessageSquare } from "lucide-react";
 
 interface HeaderProps {
   onNewCapsule: () => void;
   onOpenImportExport: () => void;
   onCaptureCurrentTab: () => void;
-  onOpenCookPrompt?: () => void;
   isCapturing: boolean;
   totalCapsules: number;
   totalMessages?: number;
@@ -15,7 +14,6 @@ export const Header: React.FC<HeaderProps> = ({
   onNewCapsule,
   onOpenImportExport,
   onCaptureCurrentTab,
-  onOpenCookPrompt,
   isCapturing,
   totalCapsules,
   totalMessages
@@ -50,7 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <>
                   <span className="w-px h-2.5 bg-slate-200" />
                   <span
-                    title={`Total conversation turns across all saved chats`}
+                    title="Total conversation turns across all saved chats"
                     className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600"
                   >
                     <MessageSquare className="w-2.5 h-2.5 fill-indigo-500 text-indigo-500" />
@@ -64,18 +62,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-1">
-          {/* Cook Prompt Button */}
-          {onOpenCookPrompt && (
-            <button
-              onClick={onOpenCookPrompt}
-              title="Cook This Prompt: enhance, benchmark and structure"
-              className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition cursor-pointer shadow-2xs"
-            >
-              <Flame className="w-3.5 h-3.5 text-amber-600" />
-              <span className="hidden sm:inline">Cook</span>
-            </button>
-          )}
-
           {/* Capture */}
           <button
             onClick={onCaptureCurrentTab}
