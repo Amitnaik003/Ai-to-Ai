@@ -175,7 +175,7 @@ export default function SidePanel() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-full bg-slate-50 text-slate-800 antialiased overflow-hidden select-none font-sans">
+    <div className="flex flex-col h-screen w-full bg-mesh text-slate-800 antialiased overflow-hidden select-none font-sans">
       {/* Header */}
       <Header
         onNewCapsule={handleOpenNew}
@@ -194,11 +194,13 @@ export default function SidePanel() {
       />
 
       {/* Main Capsule Library Feed */}
-      <main className="flex-1 overflow-y-auto p-3 space-y-2.5">
+      <main className="flex-1 overflow-y-auto p-3 space-y-2">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-16 text-slate-400 space-y-2">
-            <Sparkles className="w-6 h-6 animate-spin text-indigo-500" />
-            <p className="text-xs font-medium">Loading your capsules...</p>
+          <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 animate-spin text-indigo-500" />
+            </div>
+            <p className="text-xs font-medium">Loading your capsules…</p>
           </div>
         ) : filteredCapsules.length > 0 ? (
           filteredCapsules.map((cap) => (
@@ -213,27 +215,35 @@ export default function SidePanel() {
             />
           ))
         ) : (
-          <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 mb-3 border border-indigo-100 shadow-2xs">
-              <Inbox className="w-6 h-6" />
+          /* ── Premium empty state ─────────────────────────────────── */
+          <div className="flex flex-col items-center justify-center py-14 px-5 text-center">
+            {/* Layered icon */}
+            <div className="relative mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center border border-indigo-200/60 shadow-lg shadow-indigo-100">
+                <Inbox className="w-7 h-7 text-indigo-400" />
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+                <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
+              </div>
             </div>
-            <h3 className="text-xs font-bold text-slate-800">
+
+            <h3 className="text-sm font-bold text-slate-800">
               {filter.search || filter.platform !== "all" || filter.pinnedOnly
-                ? "No matching capsules"
-                : "Your context library is empty"}
+                ? "No capsules found"
+                : "Start your context library"}
             </h3>
-            <p className="text-[11px] text-slate-500 mt-1.5 max-w-xs leading-relaxed">
+            <p className="text-[11px] text-slate-500 mt-1.5 max-w-[220px] leading-relaxed">
               {filter.search || filter.platform !== "all" || filter.pinnedOnly
-                ? "Try clearing your search query or platform filter to see more items."
-                : "Save your favorite prompts, right-click on any page, or click Capture on ChatGPT, Claude, Gemini, or Gmail."}
+                ? "Clear your filters or search to see all capsules."
+                : "Capture chats from ChatGPT, Claude, Gemini, or Gmail — then inject them anywhere."}
             </p>
 
-            <div className="flex flex-col items-center gap-2 mt-4">
+            <div className="flex flex-col items-center gap-2 mt-5">
               <button
                 onClick={handleOpenNew}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 active:scale-[0.97] text-white shadow-md shadow-indigo-200 transition-all cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
                 <span>Create New Capsule</span>
               </button>
 
@@ -243,10 +253,10 @@ export default function SidePanel() {
                     await loadSample();
                     showToast("Sample architect prompt added!", "success");
                   }}
-                  className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 transition pt-1 cursor-pointer"
+                  className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-indigo-600 transition cursor-pointer pt-0.5"
                 >
                   <BookOpen className="w-3 h-3" />
-                  <span>Load 1 Example Prompt</span>
+                  <span>Load example prompt</span>
                 </button>
               )}
             </div>
