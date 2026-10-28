@@ -9,6 +9,8 @@ import { ImportExportModal } from "./components/ImportExportModal";
 import { triggerActiveTabCapture } from "./utils/activeTab";
 import { buildStructuredContext, getConversationStats } from "./utils/contextFormatter";
 import { setSidepanelFavicon } from "./utils/favicon";
+import { executeDeepSearch } from "./utils/deepSearch";
+import { scanSecurity } from "./utils/securityScanner";
 import type { Capsule, CapsuleFilter } from "./types";
 import { Sparkles, Inbox, Plus, AlertCircle, CheckCircle2, Info } from "lucide-react";
 
@@ -62,6 +64,11 @@ export default function SidePanel() {
     );
   }, [capsules]);
 
+  // Total security alerts across all chats in the library
+  const totalSecurityAlerts = useMemo(() => {
+    return capsules.filter((c) => !scanSecurity(c.content).isSecure).length;
+  }, [capsules]);
+
   // Set favicon for the extension window/tab
   useEffect(() => {
     setSidepanelFavicon();
@@ -97,14 +104,15 @@ export default function SidePanel() {
           return false;
         }
 
-        // Search text matching title, tags, summary, or content
+        // Security alerts only filter
+        if (filter.securityAlertsOnly && scanSecurity(cap.content).isSecure) {
+          return false;
+        }
+
+        // DeepSearch across title, summary, tags, message turns, and code blocks
         if (filter.search.trim()) {
-          const q = filter.search.toLowerCase();
-          const matchTitle = cap.title.toLowerCase().includes(q);
-          const matchSummary = cap.summary?.toLowerCase().includes(q);
-          const matchContent = cap.content?.toLowerCase().includes(q);
-          const matchTags = cap.tags?.some((t) => t.toLowerCase().includes(q));
-          if (!matchTitle && !matchSummary && !matchContent && !matchTags) {
+          const deepRes = executeDeepSearch(cap, filter.search);
+          if (!deepRes.hasMatch) {
             return false;
           }
         }
@@ -183,6 +191,7 @@ export default function SidePanel() {
         isCapturing={isCapturing}
         totalCapsules={capsules.length}
         totalMessages={totalMessages}
+        totalSecurityAlerts={totalSecurityAlerts}
       />
 
       {/* Search and Filters */}

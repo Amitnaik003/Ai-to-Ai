@@ -12,11 +12,14 @@ import {
   FileText,
   ListOrdered,
   GripVertical,
-  MessageSquare
+  MessageSquare,
+  ShieldAlert,
+  ShieldCheck
 } from "lucide-react";
 import type { Capsule, PlatformType } from "../types";
 import { injectCapsuleIntoActiveTab } from "../utils/activeTab";
 import { buildStructuredContext, getConversationStats } from "../utils/contextFormatter";
+import { scanSecurity, redactSensitiveData } from "../utils/securityScanner";
 
 interface CapsuleCardProps {
   capsule: Capsule;
@@ -146,7 +149,8 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
   onEdit,
   onDelete,
   onTogglePin,
-  onShowToast
+  onShowToast,
+  onUpdateCapsule
 }) => {
   const [copied, setCopied] = useState(false);
   const [injecting, setInjecting] = useState(false);
@@ -177,6 +181,26 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
     return structuredSequence || capsule.content;
   }, [structuredSequence, capsule.content]);
 
+  // Real-time security audit
+  const securityAudit = useMemo(
+    () => scanSecurity(activePayload),
+    [activePayload]
+  );
+
+  const handleMaskSecrets = async () => {
+    const { sanitized, redactedCount } = redactSensitiveData(capsule.content);
+    if (redactedCount > 0 && onUpdateCapsule) {
+      const updated: Capsule = {
+        ...capsule,
+        content: sanitized,
+        summary: capsule.summary ? redactSensitiveData(capsule.summary).sanitized : capsule.summary,
+        updatedAt: new Date().toISOString()
+      };
+      await onUpdateCapsule(updated);
+      onShowToast(`Masked ${redactedCount} sensitive credential(s)! 🛡️`, "success");
+    }
+  };
+
   // Copy to clipboard
   const handleCopy = async () => {
     try {
@@ -191,6 +215,13 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
 
   // Direct injection into destination LLM tab
   const handleInject = async () => {
+    if (!securityAudit.isSecure) {
+      const proceed = window.confirm(
+        `⚠️ Security Alert: This context contains ${securityAudit.totalSecrets} unmasked secret(s) (${securityAudit.findings.map((f) => f.label).join(", ")}).\n\nAre you sure you want to inject without masking?`
+      );
+      if (!proceed) return;
+    }
+
     setInjecting(true);
     try {
       const result = await injectCapsuleIntoActiveTab(activePayload);
@@ -268,6 +299,17 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
               <MessageSquare className="w-2.5 h-2.5 text-slate-500" />
               <span>{stats.label}</span>
             </span>
+
+            {/* Security Alert Badge */}
+            {!securityAudit.isSecure && (
+              <span
+                title={`Security Alert: ${securityAudit.totalSecrets} credential(s) detected: ${securityAudit.findings.map((f) => f.label).join(", ")}`}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200"
+              >
+                <ShieldAlert className="w-2.5 h-2.5 text-rose-600" />
+                <span>{securityAudit.totalSecrets} Secret{securityAudit.totalSecrets > 1 ? "s" : ""}</span>
+              </span>
+            )}
           </div>
 
           {/* Right: Pin & Overflow Menu */}
@@ -353,6 +395,18 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
 
         {/* Right: Copy & Inject Actions */}
         <div className="flex items-center gap-1.5">
+          {/* Mask Secrets Action (if secrets detected) */}
+          {!securityAudit.isSecure && onUpdateCapsule && (
+            <button
+              onClick={handleMaskSecrets}
+              title="Redact detected API keys and secrets"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 transition cursor-pointer"
+            >
+              <ShieldCheck className="w-3 h-3 text-amber-600" />
+              <span>Mask Secrets</span>
+            </button>
+          )}
+
           {/* Copy Button */}
           <button
             onClick={handleCopy}

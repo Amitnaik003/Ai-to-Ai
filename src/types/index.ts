@@ -32,6 +32,21 @@ export interface CapsuleFilter {
   search: string;
   platform: 'all' | PlatformType;
   pinnedOnly: boolean;
+  securityAlertsOnly?: boolean;
+}
+
+export interface SecurityFinding {
+  type: 'api_key' | 'private_key' | 'connection_string' | 'credential';
+  label: string;
+  snippet: string;
+  count: number;
+}
+
+export interface SecurityAuditResult {
+  isSecure: boolean;
+  findings: SecurityFinding[];
+  totalSecrets: number;
+  riskLevel: 'safe' | 'medium' | 'high';
 }
 
 export type ExtensionMessage =

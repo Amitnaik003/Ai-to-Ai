@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, X, Pin } from "lucide-react";
+import { Search, X, Pin, ShieldAlert } from "lucide-react";
 import type { CapsuleFilter, PlatformType } from "../types";
 
 interface SearchBarProps {
@@ -34,7 +34,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ filter, onFilterChange }) 
           type="text"
           value={filter.search}
           onChange={(e) => onFilterChange({ search: e.target.value })}
-          placeholder="Search conversations, tags, summaries…"
+          placeholder="DeepSearch across turns, code, prompts…"
           className="w-full pl-8 pr-8 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg
                      hover:bg-white focus:bg-white
                      focus:outline-none focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-400
@@ -50,7 +50,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ filter, onFilterChange }) 
         )}
       </div>
 
-      {/* Platform Filter Pills + Pinned Toggle */}
+      {/* Platform Filter Pills + Security + Pinned Toggle */}
       <div className="flex items-center justify-between gap-1">
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
           {PLATFORM_OPTIONS.map((item) => {
@@ -72,19 +72,35 @@ export const SearchBar: React.FC<SearchBarProps> = ({ filter, onFilterChange }) 
           })}
         </div>
 
-        {/* Pinned toggle */}
-        <button
-          onClick={() => onFilterChange({ pinnedOnly: !filter.pinnedOnly })}
-          title="Show pinned conversations only"
-          className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-all cursor-pointer font-medium border shrink-0 ${
-            filter.pinnedOnly
-              ? "bg-amber-50 text-amber-700 border-amber-200"
-              : "text-slate-500 hover:text-amber-700 hover:bg-amber-50 border-slate-200"
-          }`}
-        >
-          <Pin className={`w-3 h-3 ${filter.pinnedOnly ? "fill-amber-500 text-amber-500" : "text-slate-400"}`} />
-          <span className="hidden sm:inline">Pinned</span>
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Security Alert Filter */}
+          <button
+            onClick={() => onFilterChange({ securityAlertsOnly: !filter.securityAlertsOnly })}
+            title={filter.securityAlertsOnly ? "Showing contexts with detected secrets" : "Filter contexts with exposed secrets / API keys"}
+            className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-all cursor-pointer font-medium border ${
+              filter.securityAlertsOnly
+                ? "bg-rose-50 text-rose-700 border-rose-300 font-bold"
+                : "text-slate-500 hover:text-rose-700 hover:bg-rose-50 border-slate-200"
+            }`}
+          >
+            <ShieldAlert className={`w-3 h-3 ${filter.securityAlertsOnly ? "text-rose-600" : "text-slate-400"}`} />
+            <span className="hidden sm:inline">Security</span>
+          </button>
+
+          {/* Pinned toggle */}
+          <button
+            onClick={() => onFilterChange({ pinnedOnly: !filter.pinnedOnly })}
+            title="Show pinned conversations only"
+            className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-all cursor-pointer font-medium border ${
+              filter.pinnedOnly
+                ? "bg-amber-50 text-amber-700 border-amber-200"
+                : "text-slate-500 hover:text-amber-700 hover:bg-amber-50 border-slate-200"
+            }`}
+          >
+            <Pin className={`w-3 h-3 ${filter.pinnedOnly ? "fill-amber-500 text-amber-500" : "text-slate-400"}`} />
+            <span className="hidden sm:inline">Pinned</span>
+          </button>
+        </div>
       </div>
     </div>
   );

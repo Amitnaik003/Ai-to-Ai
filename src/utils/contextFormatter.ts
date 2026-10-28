@@ -113,7 +113,7 @@ export function parseRawTextToTurns(raw: string): CapsuleMessage[] {
 
   // 1. Support XML structured turns: <turn role="user">...</turn>
   if (raw.includes("<turn")) {
-    const xmlTurnRegex = /<turn(?:\s+index="\d+")?\s+role="(user|assistant|system)">([\s\S]*?)<\/turn>/gi;
+    const xmlTurnRegex = /<turn\b[^>]*?\brole=["'](user|assistant|system)["'][^>]*>([\s\S]*?)<\/turn>/gi;
     let match;
     while ((match = xmlTurnRegex.exec(raw)) !== null) {
       const roleStr = match[1].toLowerCase();
@@ -264,7 +264,7 @@ export function buildStructuredContext(
 
   if (formatMode === "xml") {
     const lines: string[] = [];
-    lines.push(`<context_transfer source="${sourcePlatform}"${title ? ` topic="${title.replace(/"/g, '&quot;')}"` : ""}>`);
+    lines.push(`<context_transfer source="${sourcePlatform.replace(/"/g, '&quot;')}"${title ? ` topic="${title.replace(/"/g, '&quot;')}"` : ""}>`);
     if (summary) {
       lines.push(`  <summary>${cleanTextContent(summary)}</summary>`);
     }

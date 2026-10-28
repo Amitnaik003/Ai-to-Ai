@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, Sparkles, Database, Cpu, MessageSquare } from "lucide-react";
+import { Plus, Sparkles, Database, Cpu, MessageSquare, ShieldAlert } from "lucide-react";
 
 interface HeaderProps {
   onNewCapsule: () => void;
@@ -8,6 +8,7 @@ interface HeaderProps {
   isCapturing: boolean;
   totalCapsules: number;
   totalMessages?: number;
+  totalSecurityAlerts?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,7 +17,8 @@ export const Header: React.FC<HeaderProps> = ({
   onCaptureCurrentTab,
   isCapturing,
   totalCapsules,
-  totalMessages
+  totalMessages,
+  totalSecurityAlerts
 }) => {
   return (
     <header className="sticky top-0 z-20 bg-white/96 backdrop-blur-md border-b border-slate-200/80">
@@ -53,6 +55,19 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     <MessageSquare className="w-2.5 h-2.5 fill-indigo-500 text-indigo-500" />
                     <span>{totalMessages} {totalMessages === 1 ? "turn" : "turns"}</span>
+                  </span>
+                </>
+              )}
+
+              {totalSecurityAlerts !== undefined && totalSecurityAlerts > 0 && (
+                <>
+                  <span className="w-px h-2.5 bg-slate-200" />
+                  <span
+                    title={`${totalSecurityAlerts} context(s) contain detected credentials / API keys`}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200"
+                  >
+                    <ShieldAlert className="w-2.5 h-2.5 text-rose-500" />
+                    <span>{totalSecurityAlerts} alert{totalSecurityAlerts > 1 ? "s" : ""}</span>
                   </span>
                 </>
               )}
