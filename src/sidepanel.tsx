@@ -6,10 +6,11 @@ import { SearchBar } from "./components/SearchBar";
 import { CapsuleCard } from "./components/CapsuleCard";
 import { CapsuleEditorModal } from "./components/CapsuleEditorModal";
 import { ImportExportModal } from "./components/ImportExportModal";
+import { CookPromptModal } from "./components/CookPromptModal";
 import { triggerActiveTabCapture } from "./utils/activeTab";
 import { estimateTokenCount, formatTokenCount, distillSmartCapsule } from "./utils/tokenOptimizer";
 import type { Capsule, CapsuleFilter } from "./types";
-import { Sparkles, Inbox, Plus, AlertCircle, CheckCircle2, Info, BookOpen, Zap } from "lucide-react";
+import { Sparkles, Inbox, Plus, AlertCircle, CheckCircle2, Info, BookOpen, Zap, Flame } from "lucide-react";
 
 interface ToastState {
   id: number;
@@ -27,6 +28,9 @@ export default function SidePanel() {
     clearAll,
     loadSample,
     togglePin,
+    toggleGolden,
+    branchCapsule,
+    rollbackVersion,
     exportJSON,
     importJSON,
     compressAllOversizedCapsules
@@ -36,7 +40,8 @@ export default function SidePanel() {
     search: "",
     platform: "all",
     folderId: "all",
-    pinnedOnly: false
+    pinnedOnly: false,
+    goldenOnly: false
   });
 
   const [editingCapsule, setEditingCapsule] = useState<Capsule | null>(null);
@@ -44,6 +49,10 @@ export default function SidePanel() {
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
+
+  // Cook This Prompt Modal State (Tilantra feature)
+  const [cookingCapsule, setCookingCapsule] = useState<Capsule | null>(null);
+  const [isCookModalOpen, setIsCookModalOpen] = useState(false);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
     const id = Date.now();
@@ -73,6 +82,7 @@ export default function SidePanel() {
       if (e.key === "Escape") {
         setIsEditorOpen(false);
         setIsBackupModalOpen(false);
+        setIsCookModalOpen(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -97,6 +107,11 @@ export default function SidePanel() {
           return false;
         }
 
+        // Golden only (Tilantra Golden Prompts)
+        if (filter.goldenOnly && !cap.isGolden) {
+          return false;
+        }
+
         // Search text matching title, tags, summary, or content
         if (filter.search.trim()) {
           const q = filter.search.toLowerCase();
@@ -115,6 +130,9 @@ export default function SidePanel() {
         // Pinned capsules always float to top
         if (a.isPinned && !b.isPinned) return -1;
         if (!a.isPinned && b.isPinned) return 1;
+        // Then Golden Prompts float above standard capsules
+        if (a.isGolden && !b.isGolden) return -1;
+        if (!a.isGolden && b.isGolden) return 1;
         // Then sort by most recently updated
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       });
@@ -174,6 +192,60 @@ export default function SidePanel() {
     setIsEditorOpen(true);
   };
 
+  // Branch a capsule into an independent fork
+  const handleBranch = async (id: string) => {
+    try {
+      const branched = await branchCapsule(id);
+      showToast(`Branched: "${branched.title.slice(0, 24)}" 🌿`, "success");
+    } catch (err: any) {
+      showToast(err?.message || "Failed to branch capsule", "error");
+    }
+  };
+
+  // Rollback capsule version
+  const handleRollback = async (capsuleId: string, version: number) => {
+    try {
+      const restored = await rollbackVersion(capsuleId, version);
+      if (restored) {
+        showToast(`Rolled back to v${version} (now v${restored.version})! ⏱️`, "success");
+      }
+    } catch (err: any) {
+      showToast(err?.message || "Rollback failed", "error");
+    }
+  };
+
+  // Toggle Golden Prompt status
+  const handleToggleGolden = async (id: string) => {
+    await toggleGolden(id);
+    const cap = capsules.find((c) => c.id === id);
+    const isNowGolden = !cap?.isGolden;
+    showToast(isNowGolden ? "Marked as Golden Prompt! 🏆" : "Unmarked Golden Prompt", "info");
+  };
+
+  // Open "Cook This Prompt" modal
+  const handleOpenCook = (capsule: Capsule | null) => {
+    setCookingCapsule(capsule);
+    setIsCookModalOpen(true);
+  };
+
+  // Save Cooked Prompt as a new Golden Capsule
+  const handleSaveCookedGolden = async (title: string, content: string) => {
+    const newCap: Capsule = {
+      id: `cap-golden-${Date.now()}`,
+      title,
+      summary: "Cooked Golden Prompt with frontier LLM benchmarks",
+      content,
+      platform: cookingCapsule?.platform || "manual",
+      tags: ["golden-prompt", "cooked", "benchmark"],
+      isPinned: false,
+      isGolden: true,
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    await saveCapsule(newCap);
+  };
+
   return (
     <div className="flex flex-col h-screen w-full bg-mesh text-slate-800 antialiased overflow-hidden select-none font-sans">
       {/* Header */}
@@ -181,6 +253,7 @@ export default function SidePanel() {
         onNewCapsule={handleOpenNew}
         onOpenImportExport={() => setIsBackupModalOpen(true)}
         onCaptureCurrentTab={handleCaptureCurrentTab}
+        onOpenCookPrompt={() => handleOpenCook(null)}
         isCapturing={isCapturing}
         totalCapsules={capsules.length}
         totalTokens={totalTokens}
@@ -210,6 +283,10 @@ export default function SidePanel() {
               onEdit={handleEdit}
               onDelete={deleteCapsule}
               onTogglePin={togglePin}
+              onToggleGolden={handleToggleGolden}
+              onBranch={handleBranch}
+              onRollback={handleRollback}
+              onCookPrompt={handleOpenCook}
               onShowToast={showToast}
               onUpdateCapsule={saveCapsule}
             />
@@ -228,14 +305,14 @@ export default function SidePanel() {
             </div>
 
             <h3 className="text-sm font-bold text-slate-800">
-              {filter.search || filter.platform !== "all" || filter.pinnedOnly
+              {filter.search || filter.platform !== "all" || filter.pinnedOnly || filter.goldenOnly
                 ? "No capsules found"
                 : "Start your context library"}
             </h3>
             <p className="text-[11px] text-slate-500 mt-1.5 max-w-[220px] leading-relaxed">
-              {filter.search || filter.platform !== "all" || filter.pinnedOnly
+              {filter.search || filter.platform !== "all" || filter.pinnedOnly || filter.goldenOnly
                 ? "Clear your filters or search to see all capsules."
-                : "Capture chats from ChatGPT, Claude, Gemini, or Gmail — then inject them anywhere."}
+                : "Capture chats from ChatGPT, Claude, Gemini, Perplexity, DeepSeek or Gmail — then drag or inject them anywhere."}
             </p>
 
             <div className="flex flex-col items-center gap-2 mt-5">
@@ -287,6 +364,26 @@ export default function SidePanel() {
           </div>
         </div>
       )}
+
+      {/* "Cook This Prompt" Modal (Tilantra feature) */}
+      <CookPromptModal
+        isOpen={isCookModalOpen}
+        onClose={() => setIsCookModalOpen(false)}
+        initialText={cookingCapsule ? cookingCapsule.content : ""}
+        capsuleTitle={cookingCapsule ? cookingCapsule.title : "Custom Prompt"}
+        sourceCapsule={cookingCapsule}
+        onApplyCookedText={(cookedText) => {
+          if (cookingCapsule) {
+            saveCapsule({
+              ...cookingCapsule,
+              content: cookedText,
+              updatedAt: new Date().toISOString()
+            });
+          }
+        }}
+        onSaveAsGoldenCapsule={handleSaveCookedGolden}
+        onShowToast={showToast}
+      />
 
       {/* Editor Modal */}
       <CapsuleEditorModal

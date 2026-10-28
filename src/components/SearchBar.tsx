@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, X, Pin, Folder as FolderIcon } from "lucide-react";
+import { Search, X, Pin, Folder as FolderIcon, Award } from "lucide-react";
 import type { CapsuleFilter, Folder, PlatformType } from "../types";
 
 interface SearchBarProps {
@@ -15,12 +15,14 @@ const PLATFORM_OPTIONS: {
   activeBg: string;
   activeText: string;
 }[] = [
-  { id: "all",     label: "All",     dot: "bg-slate-400",   activeBg: "bg-indigo-600",  activeText: "text-white" },
-  { id: "chatgpt", label: "ChatGPT", dot: "bg-emerald-500", activeBg: "bg-emerald-600", activeText: "text-white" },
-  { id: "claude",  label: "Claude",  dot: "bg-amber-500",   activeBg: "bg-amber-500",   activeText: "text-white" },
-  { id: "gemini",  label: "Gemini",  dot: "bg-indigo-500",  activeBg: "bg-indigo-600",  activeText: "text-white" },
-  { id: "gmail",   label: "Gmail",   dot: "bg-rose-500",    activeBg: "bg-rose-600",    activeText: "text-white" },
-  { id: "manual",  label: "Custom",  dot: "bg-slate-400",   activeBg: "bg-slate-600",   activeText: "text-white" },
+  { id: "all",        label: "All",        dot: "bg-slate-400",   activeBg: "bg-indigo-600",  activeText: "text-white" },
+  { id: "chatgpt",    label: "ChatGPT",    dot: "bg-emerald-500", activeBg: "bg-emerald-600", activeText: "text-white" },
+  { id: "claude",     label: "Claude",     dot: "bg-amber-500",   activeBg: "bg-amber-500",   activeText: "text-white" },
+  { id: "gemini",     label: "Gemini",     dot: "bg-indigo-500",  activeBg: "bg-indigo-600",  activeText: "text-white" },
+  { id: "perplexity", label: "Perplexity", dot: "bg-cyan-600",    activeBg: "bg-cyan-600",    activeText: "text-white" },
+  { id: "deepseek",   label: "DeepSeek",   dot: "bg-blue-600",    activeBg: "bg-blue-600",    activeText: "text-white" },
+  { id: "gmail",      label: "Gmail",      dot: "bg-rose-500",    activeBg: "bg-rose-600",    activeText: "text-white" },
+  { id: "manual",     label: "Custom",     dot: "bg-slate-400",   activeBg: "bg-slate-600",   activeText: "text-white" },
 ];
 
 export const SearchBar: React.FC<SearchBarProps> = ({ filter, folders, onFilterChange }) => {
@@ -70,8 +72,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({ filter, folders, onFilterC
         })}
       </div>
 
-      {/* Folder + Pinned sub-row */}
-      <div className="flex items-center justify-between">
+      {/* Folder + Pinned + Golden Filter row */}
+      <div className="flex items-center justify-between text-xs pt-0.5">
         {/* Folder select */}
         <div className="flex items-center gap-1.5 text-slate-500">
           <FolderIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -87,18 +89,35 @@ export const SearchBar: React.FC<SearchBarProps> = ({ filter, folders, onFilterC
           </select>
         </div>
 
-        {/* Pinned toggle */}
-        <button
-          onClick={() => onFilterChange({ pinnedOnly: !filter.pinnedOnly })}
-          className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-all cursor-pointer font-medium border ${
-            filter.pinnedOnly
-              ? "bg-amber-50 text-amber-700 border-amber-200"
-              : "text-slate-500 hover:text-amber-700 hover:bg-amber-50 border-transparent"
-          }`}
-        >
-          <Pin className={`w-3 h-3 ${filter.pinnedOnly ? "fill-amber-500 text-amber-500" : "text-slate-400"}`} />
-          <span>Pinned</span>
-        </button>
+        {/* Toggles: Golden + Pinned */}
+        <div className="flex items-center gap-1">
+          {/* Golden Prompts filter */}
+          <button
+            onClick={() => onFilterChange({ goldenOnly: !filter.goldenOnly })}
+            className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg transition-all cursor-pointer font-medium border ${
+              filter.goldenOnly
+                ? "bg-amber-100 text-amber-900 border-amber-300 shadow-2xs font-bold"
+                : "text-slate-500 hover:text-amber-800 hover:bg-amber-50 border-transparent"
+            }`}
+            title="Filter by Tilantra Golden Prompts"
+          >
+            <Award className={`w-3 h-3 ${filter.goldenOnly ? "fill-amber-500 text-amber-700" : "text-slate-400"}`} />
+            <span>Golden</span>
+          </button>
+
+          {/* Pinned toggle */}
+          <button
+            onClick={() => onFilterChange({ pinnedOnly: !filter.pinnedOnly })}
+            className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg transition-all cursor-pointer font-medium border ${
+              filter.pinnedOnly
+                ? "bg-amber-50 text-amber-700 border-amber-200"
+                : "text-slate-500 hover:text-amber-700 hover:bg-amber-50 border-transparent"
+            }`}
+          >
+            <Pin className={`w-3 h-3 ${filter.pinnedOnly ? "fill-amber-500 text-amber-500" : "text-slate-400"}`} />
+            <span>Pinned</span>
+          </button>
+        </div>
       </div>
     </div>
   );

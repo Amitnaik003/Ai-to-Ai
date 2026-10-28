@@ -145,6 +145,79 @@ export const CapsuleStore = {
     await safeSet(CAPSULES_KEY, updated);
   },
 
+  async toggleGolden(id: string): Promise<void> {
+    const items = await this.getCapsules();
+    const updated = items.map((c) => (c.id === id ? { ...c, isGolden: !c.isGolden } : c));
+    await safeSet(CAPSULES_KEY, updated);
+  },
+
+  /**
+   * Branches an existing capsule into a new versioned fork (Tilantra Branching)
+   */
+  async branchCapsule(id: string): Promise<Capsule> {
+    const items = await this.getCapsules();
+    const original = items.find((c) => c.id === id);
+    if (!original) {
+      throw new Error("Capsule not found to branch");
+    }
+
+    const branchCapsule: Capsule = {
+      ...original,
+      id: `cap-branch-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      title: `Branch: ${original.title.replace(/^Branch:\s*/, "")}`,
+      version: 1,
+      branchedFrom: {
+        id: original.id,
+        version: original.version,
+        title: original.title
+      },
+      tags: Array.from(new Set([...original.tags, "branched"])),
+      isPinned: false,
+      history: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const updated = [branchCapsule, ...items];
+    await safeSet(CAPSULES_KEY, updated);
+    return branchCapsule;
+  },
+
+  /**
+   * Rollback a capsule to a previous version from its history
+   */
+  async rollbackVersion(capsuleId: string, targetVersion: number): Promise<Capsule | null> {
+    const items = await this.getCapsules();
+    const index = items.findIndex((c) => c.id === capsuleId);
+    if (index === -1) return null;
+
+    const current = items[index];
+    const targetRev = current.history?.find((h) => h.version === targetVersion);
+    if (!targetRev) return null;
+
+    const previousVersion: CapsuleVersion = {
+      version: current.version,
+      updatedAt: current.updatedAt,
+      title: current.title,
+      content: current.content,
+      summary: current.summary
+    };
+
+    const restored: Capsule = {
+      ...current,
+      title: targetRev.title || current.title,
+      content: targetRev.content,
+      summary: targetRev.summary,
+      version: current.version + 1,
+      updatedAt: new Date().toISOString(),
+      history: [previousVersion, ...(current.history || [])].slice(0, 15)
+    };
+
+    items[index] = restored;
+    await safeSet(CAPSULES_KEY, items);
+    return restored;
+  },
+
   /**
    * Compresses all oversized capsules (> 1,200 tokens) in the library down to
    * compact Smart Capsules, saving 80% to 95% tokens.
@@ -347,6 +420,20 @@ export function useCapsuleStore() {
     togglePin: async (id: string) => {
       await CapsuleStore.togglePin(id);
       await refresh();
+    },
+    toggleGolden: async (id: string) => {
+      await CapsuleStore.toggleGolden(id);
+      await refresh();
+    },
+    branchCapsule: async (id: string) => {
+      const branched = await CapsuleStore.branchCapsule(id);
+      await refresh();
+      return branched;
+    },
+    rollbackVersion: async (capsuleId: string, targetVersion: number) => {
+      const restored = await CapsuleStore.rollbackVersion(capsuleId, targetVersion);
+      await refresh();
+      return restored;
     },
     saveFolder: async (folder: Folder) => {
       const saved = await CapsuleStore.saveFolder(folder);

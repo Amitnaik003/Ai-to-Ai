@@ -14,7 +14,12 @@ import {
   Zap,
   MoreHorizontal,
   FileText,
-  ListOrdered
+  ListOrdered,
+  Flame,
+  Award,
+  GitFork,
+  RotateCcw,
+  GripVertical
 } from "lucide-react";
 import type { Capsule, PlatformType } from "../types";
 import { injectCapsuleIntoActiveTab } from "../utils/activeTab";
@@ -22,7 +27,7 @@ import {
   estimateTokenCount,
   formatTokenCount,
   buildStructuredContext,
-  distillSmartCapsule,
+  distillSmartCapsule
 } from "../utils/tokenOptimizer";
 
 interface CapsuleCardProps {
@@ -30,6 +35,10 @@ interface CapsuleCardProps {
   onEdit: (capsule: Capsule) => void;
   onDelete: (id: string) => void;
   onTogglePin: (id: string) => void;
+  onToggleGolden?: (id: string) => void;
+  onBranch?: (id: string) => void;
+  onRollback?: (capsuleId: string, version: number) => void;
+  onCookPrompt?: (capsule: Capsule) => void;
   onShowToast: (msg: string, type?: "success" | "error" | "info") => void;
   onUpdateCapsule?: (capsule: Capsule) => Promise<Capsule | void>;
 }
@@ -58,6 +67,20 @@ const PLATFORM_META: Record<
     dot: "bg-indigo-500",
     stripe: "platform-stripe-gemini",
     tagClass: "tag-gemini"
+  },
+  perplexity: {
+    label: "Perplexity",
+    badge: "bg-cyan-50 text-cyan-700 border-cyan-200/70",
+    dot: "bg-cyan-600",
+    stripe: "platform-stripe-perplexity",
+    tagClass: "tag-perplexity"
+  },
+  deepseek: {
+    label: "DeepSeek",
+    badge: "bg-blue-50 text-blue-700 border-blue-200/70",
+    dot: "bg-blue-600",
+    stripe: "platform-stripe-deepseek",
+    tagClass: "tag-deepseek"
   },
   gmail: {
     label: "Gmail",
@@ -88,9 +111,11 @@ type TransferMode = "smart" | "clean" | "raw";
 const OverflowMenu: React.FC<{
   onEdit: () => void;
   onDelete: () => void;
+  onBranch?: () => void;
+  onCook?: () => void;
   onHistory: () => void;
   hasHistory: boolean;
-}> = ({ onEdit, onDelete, onHistory, hasHistory }) => {
+}> = ({ onEdit, onDelete, onBranch, onCook, onHistory, hasHistory }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -113,27 +138,50 @@ const OverflowMenu: React.FC<{
       </button>
 
       {open && (
-        <div className="absolute right-0 top-7 z-30 bg-white border border-slate-200 rounded-xl shadow-xl py-1 w-36 animate-fade-in">
+        <div className="absolute right-0 top-7 z-30 bg-white border border-slate-200 rounded-xl shadow-xl py-1 w-44 animate-fade-in text-xs">
+          {onCook && (
+            <button
+              onClick={() => { onCook(); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-amber-700 hover:bg-amber-50 font-medium transition"
+            >
+              <Flame className="w-3.5 h-3.5 text-amber-600" />
+              <span>Cook This Prompt</span>
+            </button>
+          )}
+
+          {onBranch && (
+            <button
+              onClick={() => { onBranch(); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-slate-50 font-medium transition"
+            >
+              <GitFork className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Branch (Fork Context)</span>
+            </button>
+          )}
+
           {hasHistory && (
             <button
               onClick={() => { onHistory(); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition"
             >
               <History className="w-3.5 h-3.5" />
-              <span>History</span>
+              <span>Version History</span>
             </button>
           )}
+
           <button
             onClick={() => { onEdit(); setOpen(false); }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
           >
             <Edit2 className="w-3.5 h-3.5" />
-            <span>Edit</span>
+            <span>Edit Capsule</span>
           </button>
+
           <div className="my-1 border-t border-slate-100" />
+
           <button
             onClick={() => { onDelete(); setOpen(false); }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 transition"
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-rose-600 hover:bg-rose-50 transition"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Delete</span>
@@ -150,6 +198,10 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
   onEdit,
   onDelete,
   onTogglePin,
+  onToggleGolden,
+  onBranch,
+  onRollback,
+  onCookPrompt,
   onShowToast,
   onUpdateCapsule
 }) => {
@@ -160,6 +212,7 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
   const [injectSuccess, setInjectSuccess] = useState(false);
   const [transferMode, setTransferMode] = useState<TransferMode>("clean");
   const [previewTab, setPreviewTab] = useState<TransferMode>("clean");
+  const [isDragging, setIsDragging] = useState(false);
 
   const meta = PLATFORM_META[capsule.platform] || PLATFORM_META.manual;
 
@@ -251,23 +304,56 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
     }
   };
 
+  // ── Drag and Drop Support (Tilantra Feature) ────────────────────────
+  const handleDragStart = (e: React.DragEvent) => {
+    setIsDragging(true);
+    e.dataTransfer.setData("text/plain", activePayload);
+    e.dataTransfer.setData(
+      "application/x-capsule-hub",
+      JSON.stringify({
+        id: capsule.id,
+        title: capsule.title,
+        content: activePayload,
+        platform: capsule.platform
+      })
+    );
+    e.dataTransfer.effectAllowed = "copy";
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
+
   // ── Render ─────────────────────────────────────────────────────────
   return (
     <div
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       className={`group relative card-glass rounded-xl border transition-all duration-200 overflow-hidden
         ${meta.stripe}
+        ${capsule.isGolden ? "golden-card-glow border-amber-300/80 bg-amber-50/15" : ""}
         ${
-          capsule.isPinned
+          capsule.isPinned && !capsule.isGolden
             ? "border-amber-200 shadow-md shadow-amber-100/60"
             : "border-slate-200/90 hover:border-slate-300 hover:shadow-md hover:shadow-slate-200/70"
         }
+        ${isDragging ? "opacity-60 scale-[0.98] ring-2 ring-indigo-400" : ""}
         animate-card
       `}
     >
       {/* ── Top row: badges + controls ──────────────────────────────── */}
-      <div className="flex items-start justify-between gap-2 px-3.5 pt-3 pb-0">
-        {/* Left: Platform badge + token count + version + date */}
+      <div className="flex items-start justify-between gap-1.5 px-3 pt-2.5 pb-0">
+        {/* Left: Drag Handle + Platform badge + tokens + version + date */}
         <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+          {/* Drag Handle Indicator */}
+          <span
+            title="Drag & drop this capsule directly into any AI chat input"
+            className="text-slate-300 group-hover:text-slate-500 cursor-grab active:cursor-grabbing p-0.5"
+          >
+            <GripVertical className="w-3.5 h-3.5" />
+          </span>
+
           {/* Platform pill */}
           <span
             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${meta.badge}`}
@@ -275,6 +361,17 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
             {meta.label}
           </span>
+
+          {/* Golden Prompt Badge if active */}
+          {capsule.isGolden && (
+            <span
+              title="Tilantra Golden Prompt Standard"
+              className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-md golden-badge border"
+            >
+              <Award className="w-2.5 h-2.5 fill-amber-500 text-amber-700" />
+              Golden
+            </span>
+          )}
 
           {/* Token count badge */}
           <span
@@ -302,8 +399,24 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
           </span>
         </div>
 
-        {/* Right: Pin + overflow menu + expand */}
+        {/* Right: Golden star + Pin + overflow menu + expand */}
         <div className="flex items-center gap-0.5 shrink-0">
+          {/* Golden Prompt Toggle */}
+          {onToggleGolden && (
+            <button
+              onClick={() => onToggleGolden(capsule.id)}
+              title={capsule.isGolden ? "Remove Golden Prompt status" : "Mark as Golden Prompt"}
+              className={`p-1 rounded-md transition cursor-pointer ${
+                capsule.isGolden
+                  ? "text-amber-500 bg-amber-100/70"
+                  : "text-slate-300 hover:text-amber-500 hover:bg-amber-50"
+              }`}
+            >
+              <Award className={`w-3.5 h-3.5 ${capsule.isGolden ? "fill-amber-500" : ""}`} />
+            </button>
+          )}
+
+          {/* Pin Toggle */}
           <button
             onClick={() => onTogglePin(capsule.id)}
             title={capsule.isPinned ? "Unpin" : "Pin to top"}
@@ -316,9 +429,12 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
             <Pin className={`w-3.5 h-3.5 ${capsule.isPinned ? "fill-amber-500" : ""}`} />
           </button>
 
+          {/* Overflow Menu with Branch & Cook */}
           <OverflowMenu
             onEdit={() => onEdit(capsule)}
             onDelete={() => onDelete(capsule.id)}
+            onBranch={onBranch ? () => onBranch(capsule.id) : undefined}
+            onCook={onCookPrompt ? () => onCookPrompt(capsule) : undefined}
             onHistory={() => {
               setIsExpanded(true);
               setShowHistory((v) => !v);
@@ -326,6 +442,7 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
             hasHistory={!!(capsule.history && capsule.history.length > 0)}
           />
 
+          {/* Expand/Collapse */}
           <button
             onClick={() => setIsExpanded((v) => !v)}
             title={isExpanded ? "Collapse" : "Expand preview"}
@@ -340,8 +457,18 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
         </div>
       </div>
 
+      {/* ── Branch lineage pill if branched ─────────────────────────── */}
+      {capsule.branchedFrom && (
+        <div className="px-3 pt-1">
+          <span className="inline-flex items-center gap-1 text-[9px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
+            <GitFork className="w-2.5 h-2.5" />
+            <span>Forked from: {capsule.branchedFrom.title.slice(0, 30)} (v{capsule.branchedFrom.version})</span>
+          </span>
+        </div>
+      )}
+
       {/* ── Title + Summary ─────────────────────────────────────────── */}
-      <div className="px-3.5 pt-2 pb-1">
+      <div className="px-3 pt-1.5 pb-1">
         <h3 className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition-colors leading-snug line-clamp-1">
           {capsule.title}
         </h3>
@@ -416,24 +543,41 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
             {previewPayload}
           </div>
 
-          {/* History pane */}
+          {/* History pane with Version Rollback (Tilantra feature) */}
           {showHistory && capsule.history && capsule.history.length > 0 && (
-            <div className="border-t border-slate-200/70 px-2.5 py-2 space-y-1.5 max-h-32 overflow-y-auto bg-white/60">
-              <p className="text-[10px] font-bold text-slate-600 mb-1">
-                Version History ({capsule.history.length})
-              </p>
+            <div className="border-t border-slate-200/70 px-2.5 py-2 space-y-1.5 max-h-40 overflow-y-auto bg-white/70">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[10px] font-bold text-slate-700">
+                  Version History ({capsule.history.length} revisions)
+                </p>
+                <span className="text-[9px] text-slate-400">Click rollback to restore</span>
+              </div>
               {capsule.history.map((rev) => (
                 <div
                   key={rev.version}
-                  className="p-1.5 bg-white border border-slate-200 rounded-lg text-[10px]"
+                  className="p-1.5 bg-white border border-slate-200 rounded-lg text-[10px] flex items-start justify-between gap-2"
                 >
-                  <div className="flex justify-between text-slate-500 font-semibold mb-0.5">
-                    <span>v{rev.version}</span>
-                    <span>{new Date(rev.updatedAt).toLocaleString()}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 text-slate-500 font-semibold mb-0.5">
+                      <span className="text-indigo-600 font-bold">v{rev.version}</span>
+                      <span>·</span>
+                      <span>{new Date(rev.updatedAt).toLocaleString()}</span>
+                    </div>
+                    <p className="text-slate-700 line-clamp-1 leading-snug">
+                      {rev.summary || rev.content}
+                    </p>
                   </div>
-                  <p className="text-slate-700 line-clamp-2 leading-snug">
-                    {rev.summary || rev.content}
-                  </p>
+
+                  {onRollback && (
+                    <button
+                      onClick={() => onRollback(capsule.id, rev.version)}
+                      title={`Restore version v${rev.version}`}
+                      className="inline-flex items-center gap-0.5 px-1.5 py-1 text-[9px] font-semibold text-slate-600 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 rounded shrink-0 transition cursor-pointer"
+                    >
+                      <RotateCcw className="w-2.5 h-2.5" />
+                      <span>Rollback</span>
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -442,8 +586,8 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
       )}
 
       {/* ── Bottom action bar ───────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-3.5 pb-3 pt-1.5 gap-2">
-        {/* Left: Inject + Copy */}
+      <div className="flex items-center justify-between px-3 pb-2.5 pt-1.5 gap-2">
+        {/* Left: Inject + Copy + Cook This Prompt */}
         <div className="flex items-center gap-1.5">
           {/* Inject — primary CTA */}
           <button
@@ -474,6 +618,18 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
               : <Copy className="w-3.5 h-3.5" />}
             <span>{copied ? "Copied" : "Copy"}</span>
           </button>
+
+          {/* Cook Prompt Button (Tilantra signature) */}
+          {onCookPrompt && (
+            <button
+              onClick={() => onCookPrompt(capsule)}
+              title="Cook This Prompt: enhance, benchmark and structure"
+              className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 transition cursor-pointer border border-amber-200"
+            >
+              <Flame className="w-3.5 h-3.5 text-amber-600" />
+              <span className="hidden sm:inline">Cook</span>
+            </button>
+          )}
         </div>
 
         {/* Right: Transfer mode selector */}

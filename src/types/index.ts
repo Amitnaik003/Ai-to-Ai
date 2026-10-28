@@ -2,6 +2,8 @@ export type PlatformType =
   | 'chatgpt'
   | 'claude'
   | 'gemini'
+  | 'perplexity'
+  | 'deepseek'
   | 'gmail'
   | 'manual'
   | 'other';
@@ -31,6 +33,12 @@ export interface Capsule {
   folderId?: string;
   tags: string[];
   isPinned: boolean;
+  isGolden?: boolean; // Tilantra Golden Prompt standard
+  branchedFrom?: {
+    id: string;
+    version: number;
+    title: string;
+  };
   version: number;
   history?: CapsuleVersion[];
   createdAt: string;
@@ -49,6 +57,7 @@ export interface CapsuleFilter {
   platform: 'all' | PlatformType;
   folderId: string | 'all';
   pinnedOnly: boolean;
+  goldenOnly?: boolean;
 }
 
 export type ExtensionMessage =

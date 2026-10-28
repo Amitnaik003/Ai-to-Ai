@@ -86,12 +86,41 @@ html, body, #__plasmo {
 }
 
 /* ─── Platform left-border accent ─────────────────────────────────────── */
-.platform-stripe-chatgpt { border-left: 3px solid #10b981; }
-.platform-stripe-claude   { border-left: 3px solid #f59e0b; }
-.platform-stripe-gemini   { border-left: 3px solid #6366f1; }
-.platform-stripe-gmail    { border-left: 3px solid #f43f5e; }
-.platform-stripe-manual   { border-left: 3px solid #94a3b8; }
-.platform-stripe-other    { border-left: 3px solid #06b6d4; }
+.platform-stripe-chatgpt    { border-left: 3px solid #10b981; }
+.platform-stripe-claude     { border-left: 3px solid #f59e0b; }
+.platform-stripe-gemini     { border-left: 3px solid #6366f1; }
+.platform-stripe-perplexity { border-left: 3px solid #00a3bf; }
+.platform-stripe-deepseek   { border-left: 3px solid #2563eb; }
+.platform-stripe-gmail      { border-left: 3px solid #f43f5e; }
+.platform-stripe-manual     { border-left: 3px solid #94a3b8; }
+.platform-stripe-other      { border-left: 3px solid #06b6d4; }
+
+/* ─── Golden Prompt Styling (Tilantra standard) ───────────────────────── */
+.golden-card-glow {
+  box-shadow: 0 0 0 1px #fbbf24, 0 4px 16px -2px rgba(245, 158, 11, 0.22);
+}
+.golden-badge {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border-color: #fcd34d;
+}
+
+/* ─── Tag colors ───────────────────────────────────────────────────────── */
+.tag-chatgpt    { background: #d1fae5; color: #065f46; }
+.tag-claude     { background: #fef3c7; color: #78350f; }
+.tag-gemini     { background: #e0e7ff; color: #3730a3; }
+.tag-perplexity { background: #cffafe; color: #155e75; }
+.tag-deepseek   { background: #dbeafe; color: #1e40af; }
+.tag-gmail      { background: #ffe4e6; color: #9f1239; }
+.tag-default    { background: #f1f5f9; color: #475569; }
+
+/* ─── Dragging Visual Affordance ──────────────────────────────────────── */
+.card-draggable {
+  cursor: grab;
+}
+.card-draggable:active {
+  cursor: grabbing;
+}
 
 /* ─── Inject Button Shimmer ────────────────────────────────────────────── */
 .btn-inject {
@@ -111,13 +140,6 @@ html, body, #__plasmo {
   height: 2px;
   background: linear-gradient(90deg, #6366f1, #8b5cf6, #a78bfa, transparent);
 }
-
-/* ─── Tag colors ───────────────────────────────────────────────────────── */
-.tag-chatgpt { background: #d1fae5; color: #065f46; }
-.tag-claude  { background: #fef3c7; color: #78350f; }
-.tag-gemini  { background: #e0e7ff; color: #3730a3; }
-.tag-gmail   { background: #ffe4e6; color: #9f1239; }
-.tag-default { background: #f1f5f9; color: #475569; }
 
 /* ─── Focus ring global ────────────────────────────────────────────────── */
 *:focus-visible {

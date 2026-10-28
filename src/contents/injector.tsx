@@ -12,6 +12,9 @@ export const config: PlasmoCSConfig = {
     "https://*.chatgpt.com/*",
     "https://claude.ai/*",
     "https://gemini.google.com/*",
+    "https://perplexity.ai/*",
+    "https://*.perplexity.ai/*",
+    "https://chat.deepseek.com/*",
     "https://mail.google.com/*"
   ]
 };
@@ -50,8 +53,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+// Support Drag-and-Drop injection from Sidepanel / Library
+if (typeof window !== "undefined") {
+  window.addEventListener("dragover", (e) => {
+    if (e.dataTransfer?.types.includes("application/x-capsule-hub")) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  });
+
+  window.addEventListener("drop", (e) => {
+    const rawCapsule = e.dataTransfer?.getData("application/x-capsule-hub");
+    const rawText = e.dataTransfer?.getData("text/plain");
+    const textToInject = rawCapsule ? JSON.parse(rawCapsule).content : rawText;
+
+    if (textToInject) {
+      e.preventDefault();
+      const inputEl = findActivePromptInput();
+      if (inputEl) {
+        injectTextIntoElement(inputEl, textToInject);
+      }
+    }
+  });
+}
+
 /**
- * Floating Capsule Widget on ChatGPT / Claude / Gemini / Gmail
+ * Floating Capsule Widget on ChatGPT / Claude / Gemini / Perplexity / DeepSeek / Gmail
  */
 export default function FloatingCapsuleWidget() {
   const [isOpen, setIsOpen] = useState(false);

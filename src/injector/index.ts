@@ -22,6 +22,17 @@ export function findActivePromptInput(): HTMLElement | null {
       "div[contenteditable='true'][aria-label*='Gemini']",
       "div[contenteditable='true'][aria-label*='prompt']",
 
+      // Perplexity
+      "textarea[placeholder*='Ask anything']",
+      "textarea[placeholder*='Ask follow-up']",
+      "textarea[placeholder*='Search']",
+
+      // DeepSeek
+      "#chat-input",
+      "textarea[placeholder*='DeepSeek']",
+      "textarea[placeholder*='Send a message']",
+      "textarea[placeholder*='Ask me anything']",
+
       // Gmail
       "div[role='textbox'][aria-label*='Message Body']",
       "div[role='textbox'][g_editable='true']",

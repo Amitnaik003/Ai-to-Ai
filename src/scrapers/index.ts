@@ -2,6 +2,8 @@ import { extractChatGPTChat } from "./chatgpt";
 import { extractClaudeChat } from "./claude";
 import { extractGeminiChat } from "./gemini";
 import { extractGmailChat } from "./gmail";
+import { extractPerplexityChat } from "./perplexity";
+import { extractDeepSeekChat } from "./deepseek";
 import type { Capsule, PlatformType } from "../types";
 
 export function detectCurrentPlatform(): PlatformType {
@@ -9,6 +11,8 @@ export function detectCurrentPlatform(): PlatformType {
   if (host.includes("chatgpt.com")) return "chatgpt";
   if (host.includes("claude.ai")) return "claude";
   if (host.includes("gemini.google.com")) return "gemini";
+  if (host.includes("perplexity.ai")) return "perplexity";
+  if (host.includes("deepseek.com")) return "deepseek";
   if (host.includes("mail.google.com")) return "gmail";
   return "other";
 }
@@ -23,6 +27,10 @@ export function extractCurrentPageChat(): Partial<Capsule> {
       return extractClaudeChat();
     case "gemini":
       return extractGeminiChat();
+    case "perplexity":
+      return extractPerplexityChat();
+    case "deepseek":
+      return extractDeepSeekChat();
     case "gmail":
       return extractGmailChat();
     default:

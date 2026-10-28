@@ -179,6 +179,8 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
                 <option value="chatgpt">ChatGPT</option>
                 <option value="claude">Claude</option>
                 <option value="gemini">Gemini</option>
+                <option value="perplexity">Perplexity</option>
+                <option value="deepseek">DeepSeek</option>
                 <option value="gmail">Gmail</option>
                 <option value="manual">Custom / Generic</option>
               </select>

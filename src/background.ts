@@ -26,6 +26,9 @@ chrome.runtime.onInstalled.addListener(() => {
       "*://*.chatgpt.com/*",
       "*://claude.ai/*",
       "*://gemini.google.com/*",
+      "*://perplexity.ai/*",
+      "*://*.perplexity.ai/*",
+      "*://chat.deepseek.com/*",
       "*://mail.google.com/*"
     ]
   });
@@ -36,6 +39,8 @@ function detectPlatformFromUrl(url?: string): PlatformType {
   if (url.includes("chatgpt.com")) return "chatgpt";
   if (url.includes("claude.ai")) return "claude";
   if (url.includes("gemini.google.com")) return "gemini";
+  if (url.includes("perplexity.ai")) return "perplexity";
+  if (url.includes("deepseek.com")) return "deepseek";
   if (url.includes("mail.google.com")) return "gmail";
   return "other";
 }
