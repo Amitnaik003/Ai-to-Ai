@@ -9,6 +9,7 @@ import { ImportExportModal } from "./components/ImportExportModal";
 import { CookPromptModal } from "./components/CookPromptModal";
 import { triggerActiveTabCapture } from "./utils/activeTab";
 import { buildStructuredContext, getConversationStats } from "./utils/contextFormatter";
+import { setSidepanelFavicon } from "./utils/favicon";
 import type { Capsule, CapsuleFilter } from "./types";
 import { Sparkles, Inbox, Plus, AlertCircle, CheckCircle2, Info, BookOpen, Zap, Flame } from "lucide-react";
 
@@ -73,6 +74,11 @@ export default function SidePanel() {
       0
     );
   }, [capsules]);
+
+  // Set favicon for the extension window/tab
+  useEffect(() => {
+    setSidepanelFavicon();
+  }, []);
 
   // Keyboard shortcuts (Ctrl+N for new, Escape to dismiss)
   useEffect(() => {
