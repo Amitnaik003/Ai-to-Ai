@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, Sparkles, Database, Cpu, Flame } from "lucide-react";
+import { Plus, Sparkles, Database, Cpu, Flame, MessageSquare } from "lucide-react";
 
 interface HeaderProps {
   onNewCapsule: () => void;
@@ -8,6 +8,7 @@ interface HeaderProps {
   onOpenCookPrompt?: () => void;
   isCapturing: boolean;
   totalCapsules: number;
+  totalMessages?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,7 +17,8 @@ export const Header: React.FC<HeaderProps> = ({
   onCaptureCurrentTab,
   onOpenCookPrompt,
   isCapturing,
-  totalCapsules
+  totalCapsules,
+  totalMessages
 }) => {
   return (
     <header className="sticky top-0 z-20 bg-white/96 backdrop-blur-md border-b border-slate-200/80">
@@ -41,8 +43,21 @@ export const Header: React.FC<HeaderProps> = ({
 
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="text-[10px] text-slate-500 font-medium">
-                {totalCapsules} {totalCapsules === 1 ? "capsule" : "capsules"} saved
+                {totalCapsules} {totalCapsules === 1 ? "capsule" : "capsules"}
               </span>
+
+              {totalMessages !== undefined && totalMessages > 0 && (
+                <>
+                  <span className="w-px h-2.5 bg-slate-200" />
+                  <span
+                    title={`Total conversation turns across all saved chats`}
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600"
+                  >
+                    <MessageSquare className="w-2.5 h-2.5 fill-indigo-500 text-indigo-500" />
+                    <span>{totalMessages} {totalMessages === 1 ? "turn" : "turns"}</span>
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>

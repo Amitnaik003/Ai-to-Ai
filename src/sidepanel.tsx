@@ -8,7 +8,7 @@ import { CapsuleEditorModal } from "./components/CapsuleEditorModal";
 import { ImportExportModal } from "./components/ImportExportModal";
 import { CookPromptModal } from "./components/CookPromptModal";
 import { triggerActiveTabCapture } from "./utils/activeTab";
-import { buildStructuredContext } from "./utils/contextFormatter";
+import { buildStructuredContext, getConversationStats } from "./utils/contextFormatter";
 import type { Capsule, CapsuleFilter } from "./types";
 import { Sparkles, Inbox, Plus, AlertCircle, CheckCircle2, Info, BookOpen, Zap, Flame } from "lucide-react";
 
@@ -65,6 +65,14 @@ export default function SidePanel() {
   const handleFilterChange = (updated: Partial<CapsuleFilter>) => {
     setFilter((prev) => ({ ...prev, ...updated }));
   };
+
+  // Total conversation turns across all chats in the library
+  const totalMessages = useMemo(() => {
+    return capsules.reduce(
+      (sum, c) => sum + getConversationStats(c.messages || c.content).totalMessages,
+      0
+    );
+  }, [capsules]);
 
   // Keyboard shortcuts (Ctrl+N for new, Escape to dismiss)
   useEffect(() => {
@@ -252,6 +260,7 @@ export default function SidePanel() {
         onOpenCookPrompt={() => handleOpenCook(null)}
         isCapturing={isCapturing}
         totalCapsules={capsules.length}
+        totalMessages={totalMessages}
       />
 
       {/* Search and Filters */}

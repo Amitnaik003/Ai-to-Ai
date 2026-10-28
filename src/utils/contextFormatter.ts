@@ -94,6 +94,15 @@ export function cleanTextContent(text: string, aggressive = false): string {
   return restoreCodeBlocks(result, codeBlocks).trim();
 }
 
+export interface ConversationStats {
+  totalMessages: number;
+  userMessages: number;
+  assistantMessages: number;
+  systemMessages: number;
+  label: string;
+  detailedLabel: string;
+}
+
 /**
  * Splits raw multi-turn conversation text into structured role turns.
  */
@@ -101,10 +110,28 @@ export function parseRawTextToTurns(raw: string): CapsuleMessage[] {
   if (!raw || !raw.trim()) return [];
 
   const turns: CapsuleMessage[] = [];
+
+  // 1. Support XML structured turns: <turn role="user">...</turn>
+  if (raw.includes("<turn")) {
+    const xmlTurnRegex = /<turn(?:\s+index="\d+")?\s+role="(user|assistant|system)">([\s\S]*?)<\/turn>/gi;
+    let match;
+    while ((match = xmlTurnRegex.exec(raw)) !== null) {
+      const roleStr = match[1].toLowerCase();
+      const role: "user" | "assistant" | "system" =
+        roleStr === "user" ? "user" : roleStr === "system" ? "system" : "assistant";
+      const text = match[2].trim();
+      if (text) {
+        turns.push({ role, text });
+      }
+    }
+    if (turns.length > 0) return turns;
+  }
+
+  // 2. Parse standard dialogue headers: [User]:, Assistant:, User:, etc.
   const lines = raw.split("\n");
 
   const turnHeaderRegex =
-    /^(?:(?:\[|\()?(User|Human|Assistant|AI|ChatGPT|Claude|Gemini|System)(?:\]|\))?:\s*|#+\s*(User|Human|Assistant|AI|ChatGPT|Claude|Gemini|System)\b)/i;
+    /^(?:(?:\[|\()?(User|Human|Assistant|AI|ChatGPT|Claude|Gemini|Perplexity|DeepSeek|System)(?:\]|\))?:\s*|#+\s*(User|Human|Assistant|AI|ChatGPT|Claude|Gemini|Perplexity|DeepSeek|System)\b)/i;
 
   let currentRole: "user" | "assistant" | "system" = "user";
   let currentLines: string[] = [];
@@ -151,6 +178,49 @@ export function parseRawTextToTurns(raw: string): CapsuleMessage[] {
   }
 
   return turns;
+}
+
+/**
+ * Calculates conversation turn counts, user vs AI message breakdown, and human-friendly labels.
+ */
+export function getConversationStats(turnsOrText: CapsuleMessage[] | string | undefined): ConversationStats {
+  let turns: CapsuleMessage[] = [];
+  if (Array.isArray(turnsOrText) && turnsOrText.length > 0) {
+    turns = turnsOrText;
+  } else if (typeof turnsOrText === "string" && turnsOrText.trim().length > 0) {
+    turns = parseRawTextToTurns(turnsOrText);
+  }
+
+  const userMessages = turns.filter((t) => t.role === "user").length;
+  const assistantMessages = turns.filter((t) => t.role === "assistant").length;
+  const systemMessages = turns.filter((t) => t.role === "system").length;
+  const total = turns.length || (turnsOrText ? 1 : 0);
+
+  let label = `${total} ${total === 1 ? "turn" : "turns"}`;
+  let detailedLabel = `${total} ${total === 1 ? "turn" : "turns"}`;
+
+  if (total > 1 && userMessages > 0 && assistantMessages > 0) {
+    label = `${total} msgs (${userMessages} user · ${assistantMessages} AI)`;
+    detailedLabel = `${total} messages across entire chat (${userMessages} user prompts, ${assistantMessages} AI responses)`;
+  } else if (total > 1) {
+    label = `${total} messages in chat`;
+    detailedLabel = `${total} messages in entire conversation`;
+  } else if (total === 1) {
+    label = `1 turn (Prompt)`;
+    detailedLabel = `Single prompt directive`;
+  } else {
+    label = `0 messages`;
+    detailedLabel = `Empty conversation`;
+  }
+
+  return {
+    totalMessages: total,
+    userMessages,
+    assistantMessages,
+    systemMessages,
+    label,
+    detailedLabel
+  };
 }
 
 /**

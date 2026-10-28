@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { X, Save, Sparkles, Folder as FolderIcon, RotateCcw, CheckCircle2 } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { X, Save, Sparkles, Folder as FolderIcon, RotateCcw, CheckCircle2, MessageSquare } from "lucide-react";
 import type { Capsule, Folder, PlatformType } from "../types";
 import {
   buildStructuredContext,
+  getConversationStats,
   StructureFormatMode
 } from "../utils/contextFormatter";
 
@@ -53,6 +54,8 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
   }, [capsule, isOpen]);
 
   if (!isOpen) return null;
+
+  const stats = useMemo(() => getConversationStats(content), [content]);
 
   const handleStructureAndSequence = (mode: StructureFormatMode = selectedFormat, aggressive = false) => {
     if (!content.trim()) return;
@@ -225,9 +228,18 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
               <label className="block text-[11px] font-semibold text-slate-700 uppercase tracking-wide">
                 Prompt / Context Content *
               </label>
-              <span className="text-[10px] text-slate-400 font-mono">
-                {content.length.toLocaleString()} characters
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span
+                  title={stats.detailedLabel}
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/60"
+                >
+                  <MessageSquare className="w-2.5 h-2.5 fill-indigo-600 text-indigo-600" />
+                  <span>{stats.label}</span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {content.length.toLocaleString()} chars
+                </span>
+              </div>
             </div>
 
             {/* Structure Toolbar */}

@@ -18,11 +18,12 @@ import {
   Award,
   GitFork,
   RotateCcw,
-  GripVertical
+  GripVertical,
+  MessageSquare
 } from "lucide-react";
 import type { Capsule, PlatformType } from "../types";
 import { injectCapsuleIntoActiveTab } from "../utils/activeTab";
-import { buildStructuredContext } from "../utils/contextFormatter";
+import { buildStructuredContext, getConversationStats } from "../utils/contextFormatter";
 
 interface CapsuleCardProps {
   capsule: Capsule;
@@ -211,6 +212,11 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
   const meta = PLATFORM_META[capsule.platform] || PLATFORM_META.manual;
 
   // Clean structured context preserving all conversation turns
+  const stats = useMemo(
+    () => getConversationStats(capsule.messages || capsule.content),
+    [capsule.messages, capsule.content]
+  );
+
   const structuredSequence = useMemo(
     () =>
       buildStructuredContext(capsule.messages || capsule.content, {
@@ -325,6 +331,15 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
           >
             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
             {meta.label}
+          </span>
+
+          {/* Conversation Messages Count in Entire Chat */}
+          <span
+            title={stats.detailedLabel}
+            className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50/90 text-indigo-700 border border-indigo-200/60"
+          >
+            <MessageSquare className="w-2.5 h-2.5 fill-indigo-600 text-indigo-600 shrink-0" />
+            <span>{stats.label}</span>
           </span>
 
           {/* Golden Prompt Badge if active */}
@@ -485,8 +500,11 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
               </button>
             </div>
 
-            <span className="text-[10px] text-slate-400 font-mono pr-1">
-              {capsule.content.length} characters
+            <span className="text-[10px] text-slate-500 font-medium pr-1 flex items-center gap-1">
+              <MessageSquare className="w-3 h-3 text-indigo-500" />
+              <span>{stats.totalMessages} conversation {stats.totalMessages === 1 ? "turn" : "turns"}</span>
+              <span>·</span>
+              <span className="font-mono text-slate-400">{capsule.content.length} chars</span>
             </span>
           </div>
 
