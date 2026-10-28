@@ -1,6 +1,6 @@
 import { CapsuleStore } from "./storage/capsuleStore";
 import type { PlatformType } from "./types";
-import { optimizeContext, buildStructuredContext } from "./utils/tokenOptimizer";
+import { optimizeContext, buildStructuredContext } from "./utils/contextFormatter";
 
 // Configure side panel to open on extension action icon click
 chrome.runtime.onInstalled.addListener(() => {

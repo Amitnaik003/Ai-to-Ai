@@ -8,7 +8,7 @@ import { CapsuleEditorModal } from "./components/CapsuleEditorModal";
 import { ImportExportModal } from "./components/ImportExportModal";
 import { CookPromptModal } from "./components/CookPromptModal";
 import { triggerActiveTabCapture } from "./utils/activeTab";
-import { estimateTokenCount, formatTokenCount, distillSmartCapsule } from "./utils/tokenOptimizer";
+import { buildStructuredContext } from "./utils/contextFormatter";
 import type { Capsule, CapsuleFilter } from "./types";
 import { Sparkles, Inbox, Plus, AlertCircle, CheckCircle2, Info, BookOpen, Zap, Flame } from "lucide-react";
 
@@ -65,11 +65,6 @@ export default function SidePanel() {
   const handleFilterChange = (updated: Partial<CapsuleFilter>) => {
     setFilter((prev) => ({ ...prev, ...updated }));
   };
-
-  // Total tokens calculated across the entire library
-  const totalTokens = useMemo(() => {
-    return capsules.reduce((sum, c) => sum + estimateTokenCount(c.content), 0);
-  }, [capsules]);
 
   // Keyboard shortcuts (Ctrl+N for new, Escape to dismiss)
   useEffect(() => {
@@ -148,12 +143,14 @@ export default function SidePanel() {
 
       if (result.success && result.capsule) {
         const rawContent = result.capsule.content || "";
-        const distilled = distillSmartCapsule(result.capsule.messages || rawContent, {
+        const structured = buildStructuredContext(result.capsule.messages || rawContent, {
+          formatMode: "xml",
           sourcePlatform: (result.capsule.platform || "other").toUpperCase(),
           title: result.capsule.title || "Captured Context",
-          summary: result.capsule.summary || "Conversation capture"
+          summary: result.capsule.summary || "Conversation capture",
+          includeHandoff: true
         });
-        const content = distilled.optimized || rawContent;
+        const content = structured.optimized || rawContent;
 
         const newCap: Capsule = {
           id: `cap-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -163,7 +160,7 @@ export default function SidePanel() {
           messages: result.capsule.messages,
           platform: result.capsule.platform || "other",
           sourceUrl: result.capsule.sourceUrl,
-          tags: result.capsule.tags || ["auto-capture", "low-token-capsule"],
+          tags: result.capsule.tags || ["auto-capture", "structured-context"],
           isPinned: false,
           version: 1,
           createdAt: new Date().toISOString(),
@@ -171,8 +168,7 @@ export default function SidePanel() {
           history: []
         };
         const saved = await saveCapsule(newCap);
-        const savingsBadge = distilled.savedTokens > 0 ? ` (Saved ${distilled.savedTokens} tokens!)` : "";
-        showToast(`Captured: "${saved.title.slice(0, 20)}"${savingsBadge}`, "success");
+        showToast(`Captured: "${saved.title.slice(0, 24)}"`, "success");
       } else {
         showToast(result.error || "Unable to extract chat context", "error");
       }
@@ -256,7 +252,6 @@ export default function SidePanel() {
         onOpenCookPrompt={() => handleOpenCook(null)}
         isCapturing={isCapturing}
         totalCapsules={capsules.length}
-        totalTokens={totalTokens}
       />
 
       {/* Search and Filters */}

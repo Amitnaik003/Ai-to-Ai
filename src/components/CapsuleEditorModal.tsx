@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { X, Save, Sparkles, Folder as FolderIcon, Zap, RotateCcw, CheckCircle2, ListOrdered, Code2 } from "lucide-react";
+import { X, Save, Sparkles, Folder as FolderIcon, RotateCcw, CheckCircle2 } from "lucide-react";
 import type { Capsule, Folder, PlatformType } from "../types";
 import {
-  estimateTokenCount,
-  formatTokenCount,
   buildStructuredContext,
-  optimizeContext,
-  StructureFormatMode,
-  OptimizationResult
-} from "../utils/tokenOptimizer";
+  StructureFormatMode
+} from "../utils/contextFormatter";
 
 interface CapsuleEditorModalProps {
   capsule: Capsule | null;
@@ -32,13 +28,8 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
   const [folderId, setFolderId] = useState<string>("");
   const [tagsInput, setTagsInput] = useState("");
   const [selectedFormat, setSelectedFormat] = useState<StructureFormatMode>("xml");
-
   const [feedback, setFeedback] = useState<{
-    originalTokens: number;
-    optimizedTokens: number;
-    savedTokens: number;
-    savingsPercent: number;
-    turnsCount?: number;
+    message: string;
     prevContent: string;
   } | null>(null);
 
@@ -63,8 +54,6 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
 
   if (!isOpen) return null;
 
-  const currentTokenCount = estimateTokenCount(content);
-
   const handleStructureAndSequence = (mode: StructureFormatMode = selectedFormat, aggressive = false) => {
     if (!content.trim()) return;
 
@@ -78,10 +67,7 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
     });
 
     setFeedback({
-      originalTokens: result.originalTokens,
-      optimizedTokens: result.optimizedTokens,
-      savedTokens: result.savedTokens,
-      savingsPercent: result.savingsPercent,
+      message: "Context structured and ordered cleanly!",
       prevContent: content
     });
     setContent(result.optimized);
@@ -233,32 +219,23 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
             />
           </div>
 
-          {/* Prompt / Context Payload with Live Token Optimization & Structured Formatting */}
+          {/* Prompt / Context Payload with Clean Formatting Toolbar */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-[11px] font-semibold text-slate-700 uppercase tracking-wide">
                 Prompt / Context Content *
               </label>
-              <div className="flex items-center gap-2">
-                <span
-                  title="Estimated LLM prompt tokens (GPT-4o, Claude 3.5, Gemini 1.5)"
-                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/70 px-2 py-0.5 rounded-full"
-                >
-                  <Zap className="w-2.5 h-2.5 fill-indigo-600 text-indigo-600" />
-                  {formatTokenCount(currentTokenCount)}
-                </span>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  {content.length.toLocaleString()} chars
-                </span>
-              </div>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {content.length.toLocaleString()} characters
+              </span>
             </div>
 
-            {/* Structure & Token Saver Toolbar */}
-            <div className="mb-2 p-2.5 bg-gradient-to-r from-emerald-50/80 via-slate-50 to-indigo-50/80 border border-indigo-100 rounded-xl space-y-2">
+            {/* Structure Toolbar */}
+            <div className="mb-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-800 font-semibold">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Token Reduction Mode</span>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-700 font-semibold">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <span>Structure Context</span>
                 </div>
 
                 {/* Format Mode Selector */}
@@ -299,42 +276,24 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
                   >
                     Compact
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedFormat("smart_capsule")}
-                    className={`px-2 py-0.5 rounded transition cursor-pointer ${
-                      selectedFormat === "smart_capsule"
-                        ? "bg-emerald-600 text-white font-bold shadow-xs"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                    title="Smart Capsule: extracts key rules, code, and active task (80%-95% token reduction)"
-                  >
-                    ⚡ Smart
-                  </button>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-between gap-2 pt-1 border-t border-indigo-100/70">
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/70">
                 <span className="text-[10px] text-slate-500">
-                  {selectedFormat === "smart_capsule"
-                    ? "Condenses 30+ turns into key rules, code, and active task"
-                    : "Orders turns chronologically & removes conversational pleasantries"}
+                  Orders turns chronologically and structures for target AI
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => handleStructureAndSequence(selectedFormat, false)}
                     disabled={!content.trim()}
-                    className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-md transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
-                      selectedFormat === "smart_capsule"
-                        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                        : "bg-indigo-600 hover:bg-indigo-700 text-white"
-                    }`}
-                    title="Transform into selected format to minimize tokens"
+                    className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-md bg-indigo-600 hover:bg-indigo-700 text-white transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    title="Transform into structured sequence"
                   >
-                    <Zap className="w-3 h-3" />
-                    <span>{selectedFormat === "smart_capsule" ? "⚡ Distill Smart Capsule" : "⚡ Format & Clean Sequence"}</span>
+                    <Sparkles className="w-3 h-3" />
+                    <span>Format Sequence</span>
                   </button>
 
                   <button
@@ -350,18 +309,12 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
               </div>
             </div>
 
-            {/* Feedback Banner if structured/optimized */}
+            {/* Feedback Banner if structured */}
             {feedback && (
               <div className="mb-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-[11px] text-emerald-800 animate-in fade-in">
                 <div className="flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  {feedback.savedTokens > 0 ? (
-                    <span>
-                      Distilled! Saved <strong>{feedback.savedTokens} tokens</strong> ({feedback.savingsPercent}% reduction: {feedback.originalTokens} ➔ {feedback.optimizedTokens} tokens)
-                    </span>
-                  ) : (
-                    <span>Context formatted in correct sequence with zero filler!</span>
-                  )}
+                  <span>{feedback.message}</span>
                 </div>
                 <button
                   type="button"

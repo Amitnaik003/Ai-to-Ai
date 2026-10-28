@@ -6,10 +6,7 @@ import {
   Check,
   Copy,
   Send,
-  Zap,
-  Award,
-  ChevronRight,
-  ArrowRight
+  Award
 } from "lucide-react";
 import {
   COOK_RECIPES,
@@ -17,7 +14,6 @@ import {
   cookPrompt,
   CookedPromptResult
 } from "../utils/promptCooker";
-import { formatTokenCount } from "../utils/tokenOptimizer";
 import { injectCapsuleIntoActiveTab } from "../utils/activeTab";
 import type { Capsule } from "../types";
 
@@ -124,7 +120,7 @@ export const CookPromptModal: React.FC<CookPromptModalProps> = ({
                   Cook This Prompt
                 </h2>
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
-                  Tilantra Style
+                  Prompt Enhancer
                 </span>
               </div>
               <p className="text-[11px] text-slate-500">
@@ -182,9 +178,7 @@ export const CookPromptModal: React.FC<CookPromptModalProps> = ({
                 Recipe Upgrades Applied:
               </span>
               <span className="text-[10px] font-semibold text-slate-500">
-                {formatTokenCount(cookedResult.cookedTokens)} (
-                {cookedResult.tokenDelta >= 0 ? `+${cookedResult.tokenDelta}` : cookedResult.tokenDelta} tokens
-                )
+                {cookedResult.cookedText.length} characters
               </span>
             </div>
             <ul className="text-[11px] text-amber-800 space-y-0.5 pl-4 list-disc">

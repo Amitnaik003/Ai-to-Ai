@@ -11,7 +11,6 @@ import {
   History,
   Clock,
   Sparkles,
-  Zap,
   MoreHorizontal,
   FileText,
   ListOrdered,
@@ -23,12 +22,7 @@ import {
 } from "lucide-react";
 import type { Capsule, PlatformType } from "../types";
 import { injectCapsuleIntoActiveTab } from "../utils/activeTab";
-import {
-  estimateTokenCount,
-  formatTokenCount,
-  buildStructuredContext,
-  distillSmartCapsule
-} from "../utils/tokenOptimizer";
+import { buildStructuredContext } from "../utils/contextFormatter";
 
 interface CapsuleCardProps {
   capsule: Capsule;
@@ -105,7 +99,7 @@ const PLATFORM_META: Record<
   }
 };
 
-type TransferMode = "smart" | "clean" | "raw";
+type TransferMode = "formatted" | "raw";
 
 /* ─── Overflow Menu ────────────────────────────────────────────────────── */
 const OverflowMenu: React.FC<{
@@ -210,29 +204,14 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
   const [copied, setCopied] = useState(false);
   const [isInjecting, setIsInjecting] = useState(false);
   const [injectSuccess, setInjectSuccess] = useState(false);
-  const [transferMode, setTransferMode] = useState<TransferMode>("clean");
-  const [previewTab, setPreviewTab] = useState<TransferMode>("clean");
+  const [transferMode, setTransferMode] = useState<TransferMode>("formatted");
+  const [previewTab, setPreviewTab] = useState<TransferMode>("formatted");
   const [isDragging, setIsDragging] = useState(false);
 
   const meta = PLATFORM_META[capsule.platform] || PLATFORM_META.manual;
 
-  // ── Token calculations ──────────────────────────────────────────────
-  const rawTokens = useMemo(
-    () => estimateTokenCount(capsule.content),
-    [capsule.content]
-  );
-
-  const smartCapsule = useMemo(
-    () =>
-      distillSmartCapsule(capsule.messages || capsule.content, {
-        sourcePlatform: capsule.platform.toUpperCase(),
-        title: capsule.title,
-        summary: capsule.summary
-      }),
-    [capsule]
-  );
-
-  const cleanSequence = useMemo(
+  // Clean structured context preserving all conversation turns
+  const structuredSequence = useMemo(
     () =>
       buildStructuredContext(capsule.messages || capsule.content, {
         formatMode: "xml",
@@ -245,37 +224,26 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
   );
 
   const activePayload = useMemo(() => {
-    if (transferMode === "smart") return smartCapsule.optimized;
-    if (transferMode === "clean") return cleanSequence.optimized;
+    if (transferMode === "formatted") return structuredSequence.optimized;
     return capsule.content;
-  }, [transferMode, smartCapsule, cleanSequence, capsule.content]);
-
-  const activeTokens = useMemo(() => {
-    if (transferMode === "smart") return smartCapsule.optimizedTokens;
-    if (transferMode === "clean") return cleanSequence.optimizedTokens;
-    return rawTokens;
-  }, [transferMode, smartCapsule, cleanSequence, rawTokens]);
+  }, [transferMode, structuredSequence, capsule.content]);
 
   const previewPayload = useMemo(() => {
-    if (previewTab === "smart") return smartCapsule.optimized;
-    if (previewTab === "clean") return cleanSequence.optimized;
+    if (previewTab === "formatted") return structuredSequence.optimized;
     return capsule.content;
-  }, [previewTab, smartCapsule, cleanSequence, capsule.content]);
-
-  const hasBigSavings = rawTokens > 1000 && smartCapsule.savedTokens > 500;
+  }, [previewTab, structuredSequence, capsule.content]);
 
   // ── Handlers ───────────────────────────────────────────────────────
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(activePayload);
       setCopied(true);
-      const label =
-        transferMode === "clean"
-          ? "Full structured sequence copied!"
-          : transferMode === "smart"
-          ? `Condensed capsule copied (${formatTokenCount(smartCapsule.optimizedTokens)})!`
-          : "Raw context copied!";
-      onShowToast(label, "success");
+      onShowToast(
+        transferMode === "formatted"
+          ? "Structured context sequence copied!"
+          : "Raw context copied!",
+        "success"
+      );
       setTimeout(() => setCopied(false), 2000);
     } catch {
       onShowToast("Failed to copy to clipboard", "error");
@@ -291,11 +259,9 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
     if (result.success) {
       setInjectSuccess(true);
       onShowToast(
-        transferMode === "smart"
-          ? "Condensed capsule injected! 🚀"
-          : transferMode === "raw"
-          ? "Raw context injected!"
-          : "Full structured sequence injected! 🚀",
+        transferMode === "formatted"
+          ? "Structured sequence injected into chat! 🚀"
+          : "Raw context injected! 🚀",
         "success"
       );
       setTimeout(() => setInjectSuccess(false), 2500);
@@ -324,7 +290,6 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
     setIsDragging(false);
   };
 
-  // ── Render ─────────────────────────────────────────────────────────
   return (
     <div
       draggable
@@ -344,7 +309,7 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
     >
       {/* ── Top row: badges + controls ──────────────────────────────── */}
       <div className="flex items-start justify-between gap-1.5 px-3 pt-2.5 pb-0">
-        {/* Left: Drag Handle + Platform badge + tokens + version + date */}
+        {/* Left: Drag Handle + Platform badge + version + date */}
         <div className="flex items-center gap-1.5 flex-wrap min-w-0">
           {/* Drag Handle Indicator */}
           <span
@@ -372,15 +337,6 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
               Golden
             </span>
           )}
-
-          {/* Token count badge */}
-          <span
-            title={`~${activeTokens} tokens · ${capsule.content.length} chars`}
-            className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-600 border border-indigo-100"
-          >
-            <Zap className="w-2.5 h-2.5 fill-indigo-500 text-indigo-500 shrink-0" />
-            {formatTokenCount(activeTokens)}
-          </span>
 
           {/* Version */}
           {capsule.version > 1 && (
@@ -505,36 +461,32 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
           {/* Preview tab strip */}
           <div className="flex items-center justify-between px-2 py-1.5 border-b border-slate-200/70 bg-white/70">
             <div className="flex items-center bg-slate-100 p-0.5 rounded-lg gap-px">
-              {(
-                [
-                  { id: "clean", icon: <ListOrdered className="w-3 h-3" />, label: "Sequence" },
-                  { id: "raw",   icon: <FileText className="w-3 h-3" />,    label: "Raw" },
-                  { id: "smart", icon: <Zap className="w-3 h-3" />,         label: "⚡ Smart" }
-                ] as { id: TransferMode; icon: React.ReactNode; label: string }[]
-              ).map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setPreviewTab(tab.id)}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition cursor-pointer ${
-                    previewTab === tab.id
-                      ? tab.id === "smart"
-                        ? "bg-white text-emerald-700 shadow-sm"
-                        : tab.id === "raw"
-                        ? "bg-white text-slate-800 shadow-sm"
-                        : "bg-white text-indigo-700 shadow-sm"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  {tab.icon}
-                  {tab.label}
-                </button>
-              ))}
+              <button
+                onClick={() => setPreviewTab("formatted")}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition cursor-pointer ${
+                  previewTab === "formatted"
+                    ? "bg-white text-indigo-700 shadow-sm"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <ListOrdered className="w-3 h-3" />
+                Formatted
+              </button>
+              <button
+                onClick={() => setPreviewTab("raw")}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition cursor-pointer ${
+                  previewTab === "raw"
+                    ? "bg-white text-slate-800 shadow-sm"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <FileText className="w-3 h-3" />
+                Raw Text
+              </button>
             </div>
 
             <span className="text-[10px] text-slate-400 font-mono pr-1">
-              {previewTab === "smart" && hasBigSavings
-                ? `−${formatTokenCount(smartCapsule.savedTokens)} saved`
-                : `${capsule.content.length} chars`}
+              {capsule.content.length} characters
             </span>
           </div>
 
@@ -593,7 +545,7 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
           <button
             onClick={handleInject}
             disabled={isInjecting}
-            className={`btn-inject flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all cursor-pointer ${
+            className={`btn-inject flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white transition-all cursor-pointer ${
               injectSuccess ? "!bg-emerald-500 !bg-none" : isInjecting ? "opacity-70 cursor-wait" : ""
             }`}
             title="Inject context into active chat input"
@@ -624,7 +576,7 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
             <button
               onClick={() => onCookPrompt(capsule)}
               title="Cook This Prompt: enhance, benchmark and structure"
-              className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 transition cursor-pointer border border-amber-200"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 transition cursor-pointer border border-amber-200"
             >
               <Flame className="w-3.5 h-3.5 text-amber-600" />
               <span className="hidden sm:inline">Cook</span>
@@ -632,34 +584,30 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
           )}
         </div>
 
-        {/* Right: Transfer mode selector */}
+        {/* Right: Transfer mode selector: Formatted vs Raw */}
         <div className="flex items-center bg-slate-100 border border-slate-200/80 p-0.5 rounded-lg gap-px">
-          {(
-            [
-              { mode: "clean", label: "Seq",         activeClass: "text-indigo-700" },
-              { mode: "raw",   label: "Raw",         activeClass: "text-slate-800"  },
-              { mode: "smart", label: "⚡",          activeClass: "text-emerald-700" }
-            ] as { mode: TransferMode; label: string; activeClass: string }[]
-          ).map((item) => (
-            <button
-              key={item.mode}
-              onClick={() => setTransferMode(item.mode)}
-              title={
-                item.mode === "clean"
-                  ? "Full Sequence: all turns preserved"
-                  : item.mode === "raw"
-                  ? "Raw: original untouched text"
-                  : "⚡ Condensed: key rules + code only"
-              }
-              className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition cursor-pointer ${
-                transferMode === item.mode
-                  ? `bg-white shadow-sm ${item.activeClass}`
-                  : "text-slate-400 hover:text-slate-700"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
+          <button
+            onClick={() => setTransferMode("formatted")}
+            title="Formatted Sequence: all turns in chronological order"
+            className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition cursor-pointer ${
+              transferMode === "formatted"
+                ? "bg-white shadow-sm text-indigo-700"
+                : "text-slate-400 hover:text-slate-700"
+            }`}
+          >
+            Formatted
+          </button>
+          <button
+            onClick={() => setTransferMode("raw")}
+            title="Raw: original untouched text"
+            className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition cursor-pointer ${
+              transferMode === "raw"
+                ? "bg-white shadow-sm text-slate-800"
+                : "text-slate-400 hover:text-slate-700"
+            }`}
+          >
+            Raw
+          </button>
         </div>
       </div>
     </div>

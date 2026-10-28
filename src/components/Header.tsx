@@ -1,6 +1,5 @@
 import React from "react";
-import { Plus, Sparkles, Database, Zap, Cpu, Flame } from "lucide-react";
-import { formatTokenCount } from "../utils/tokenOptimizer";
+import { Plus, Sparkles, Database, Cpu, Flame } from "lucide-react";
 
 interface HeaderProps {
   onNewCapsule: () => void;
@@ -9,7 +8,6 @@ interface HeaderProps {
   onOpenCookPrompt?: () => void;
   isCapturing: boolean;
   totalCapsules: number;
-  totalTokens?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -18,11 +16,8 @@ export const Header: React.FC<HeaderProps> = ({
   onCaptureCurrentTab,
   onOpenCookPrompt,
   isCapturing,
-  totalCapsules,
-  totalTokens
+  totalCapsules
 }) => {
-  const isLargeLibrary = (totalTokens ?? 0) > 5000;
-
   return (
     <header className="sticky top-0 z-20 bg-white/96 backdrop-blur-md border-b border-slate-200/80">
       {/* Main header row */}
@@ -45,30 +40,16 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-[10px] text-slate-500">
-                {totalCapsules} {totalCapsules === 1 ? "capsule" : "capsules"}
+              <span className="text-[10px] text-slate-500 font-medium">
+                {totalCapsules} {totalCapsules === 1 ? "capsule" : "capsules"} saved
               </span>
-
-              {totalTokens !== undefined && totalTokens > 0 && (
-                <>
-                  <span className="w-px h-2.5 bg-slate-200" />
-                  <span
-                    className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${
-                      isLargeLibrary ? "text-violet-600" : "text-indigo-500"
-                    }`}
-                  >
-                    <Zap className={`w-2.5 h-2.5 ${isLargeLibrary ? "fill-violet-500 text-violet-500" : "fill-indigo-500 text-indigo-500"}`} />
-                    {formatTokenCount(totalTokens)}
-                  </span>
-                </>
-              )}
             </div>
           </div>
         </div>
 
         {/* Action Buttons */}
         <div className="flex items-center gap-1">
-          {/* Cook Prompt Button (Tilantra Signature) */}
+          {/* Cook Prompt Button */}
           {onOpenCookPrompt && (
             <button
               onClick={onOpenCookPrompt}

@@ -1,5 +1,5 @@
 import type { CapsuleMessage, Capsule } from "../types";
-import { buildStructuredContext } from "../utils/tokenOptimizer";
+import { buildStructuredContext } from "../utils/contextFormatter";
 
 export function extractChatGPTChat(): Partial<Capsule> {
   const messages: CapsuleMessage[] = [];
@@ -42,7 +42,7 @@ export function extractChatGPTChat(): Partial<Capsule> {
       ? `Conversation with ${messages.length} messages. First prompt: ${messages[0]?.text.slice(0, 90)}...`
       : "Captured conversation from ChatGPT";
 
-  // Build clean structured context preserving all turns while reducing token fluff
+  // Build clean structured context preserving all turns cleanly
   const structured = buildStructuredContext(messages, {
     formatMode: "xml",
     sourcePlatform: "ChatGPT",

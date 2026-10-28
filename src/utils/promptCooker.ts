@@ -1,10 +1,10 @@
-import { estimateTokenCount, cleanTextContent } from "./tokenOptimizer";
+import { cleanTextContent } from "./contextFormatter";
 
 export type CookRecipeId =
   | "golden_standard"
   | "staff_architect"
   | "deep_research"
-  | "token_diet"
+  | "concise_directives"
   | "guardrails";
 
 export interface CookRecipe {
@@ -45,10 +45,10 @@ export const COOK_RECIPES: CookRecipe[] = [
     icon: "🛡️"
   },
   {
-    id: "token_diet",
-    name: "Ultra-Concise Token Diet",
-    tagline: "Strips All Fluff into High-Density Directives (-40% to -65% Tokens)",
-    description: "Turns wordy explanations into ultra-dense imperative directives to save tokens.",
+    id: "concise_directives",
+    name: "Ultra-Concise Directives",
+    tagline: "High-Density Imperative Directives (Direct & Actionable)",
+    description: "Converts conversational explanations into clean, high-precision imperative instructions.",
     icon: "✂️"
   }
 ];
@@ -57,9 +57,6 @@ export interface CookedPromptResult {
   recipeId: CookRecipeId;
   originalText: string;
   cookedText: string;
-  originalTokens: number;
-  cookedTokens: number;
-  tokenDelta: number;
   highlightPoints: string[];
 }
 
@@ -75,7 +72,6 @@ export function cookPrompt(
   }
 ): CookedPromptResult {
   const cleaned = cleanTextContent(rawPrompt).trim();
-  const originalTokens = estimateTokenCount(cleaned);
 
   let cooked = "";
   const highlightPoints: string[] = [];
@@ -168,10 +164,10 @@ export function cookPrompt(
       break;
     }
 
-    case "token_diet": {
+    case "concise_directives": {
       highlightPoints.push("Stripped all narrative padding and conversational pleasantries");
       highlightPoints.push("Reformatted into high-density imperative bullet points");
-      highlightPoints.push("Maximized token efficiency (-40% to -65% savings)");
+      highlightPoints.push("Direct execution instructions without preambles");
 
       // Compact imperative translation
       const compactLines = cleaned
@@ -196,16 +192,10 @@ export function cookPrompt(
     }
   }
 
-  const cookedTokens = estimateTokenCount(cooked);
-  const tokenDelta = cookedTokens - originalTokens;
-
   return {
     recipeId,
     originalText: cleaned,
     cookedText: cooked,
-    originalTokens,
-    cookedTokens,
-    tokenDelta,
     highlightPoints
   };
 }

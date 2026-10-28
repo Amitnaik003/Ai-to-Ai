@@ -1,5 +1,5 @@
 import type { CapsuleMessage, Capsule } from "../types";
-import { buildStructuredContext } from "../utils/tokenOptimizer";
+import { buildStructuredContext } from "../utils/contextFormatter";
 
 export function extractPerplexityChat(): Partial<Capsule> {
   const messages: CapsuleMessage[] = [];

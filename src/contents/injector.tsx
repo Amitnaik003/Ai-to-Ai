@@ -3,7 +3,7 @@ import type { PlasmoCSConfig } from "plasmo";
 import { findActivePromptInput, injectTextIntoElement } from "../injector";
 import { extractCurrentPageChat, detectCurrentPlatform } from "../scrapers";
 import { CapsuleStore } from "../storage/capsuleStore";
-import { buildStructuredContext } from "../utils/tokenOptimizer";
+import { buildStructuredContext } from "../utils/contextFormatter";
 import { Sparkles, ArrowRight, X } from "lucide-react";
 
 export const config: PlasmoCSConfig = {
