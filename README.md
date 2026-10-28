@@ -1,6 +1,6 @@
-# AI to AI - Context Transfer Extension
+# PromptWarp - AI Context Teleporter
 
-A production-ready Chrome Extension (Manifest V3) for seamless AI context capture, curation, and transfer. Seamlessly capture, categorize, version, and transfer prompt contexts and conversation history between **ChatGPT**, **Claude**, **Gemini**, **Perplexity**, **DeepSeek**, and **Gmail** with **zero hallucinations** and **complete conversation fidelity**.
+A production-ready Chrome Extension (Manifest V3) for seamless AI context capture, curation, and teleportation. Seamlessly capture, categorize, version, and transfer prompt contexts and conversation history between **ChatGPT**, **Claude**, **Gemini**, **Perplexity**, **DeepSeek**, and **Gmail** with **zero hallucinations** and **complete conversation fidelity**.
 
 ---
 
@@ -43,7 +43,7 @@ A production-ready Chrome Extension (Manifest V3) for seamless AI context captur
 
 ## 📥 How to Add & Load This Extension in Chrome
 
-Follow these step-by-step instructions to load AI to AI into Google Chrome (or Edge, Brave, Opera, Arc):
+Follow these step-by-step instructions to load PromptWarp into Google Chrome (or Edge, Brave, Opera, Arc):
 
 ### Step 1: Open the Extensions Page in Chrome
 * Open Google Chrome.
@@ -71,24 +71,24 @@ Browse to your project directory and select:
 
 ### Step 5: Pin the Extension to the Chrome Toolbar
 1. Click the **Puzzle Piece icon (🧩)** in the top right of your Chrome toolbar.
-2. Find **AI to AI - Context Transfer**.
+2. Find **PromptWarp - AI Context Teleporter**.
 3. Click the **Pin icon (📌)** so it is always visible on your toolbar.
 
 ---
 
-## 💡 How to Use AI to AI
+## 💡 How to Use PromptWarp
 
 ### 1. Opening the Library
-* Click the **AI to AI icon** on your Chrome toolbar to open the docked Side Panel.
-* Or click the floating **AI to AI button** in the bottom-right corner when browsing ChatGPT, Claude, Gemini, Perplexity, DeepSeek, or Gmail.
+* Click the **PromptWarp icon** on your Chrome toolbar to open the docked Side Panel.
+* Or click the floating **PromptWarp button** in the bottom-right corner when browsing ChatGPT, Claude, Gemini, Perplexity, DeepSeek, or Gmail.
 
 ### 2. Capturing Chats & Contexts
 * **1-Click Full Chat Capture:** On any supported tab, click the floating widget in the bottom-right corner and select **"Capture Chat Context"**.
-* **Right-Click Selection Capture:** Highlight any text on any webpage, right-click, and select **"Save Selection to AI to AI"**.
+* **Right-Click Selection Capture:** Highlight any text on any webpage, right-click, and select **"Save Selection to PromptWarp"**.
 
 ### 3. Transferring / Injecting Context into Another LLM
 1. Open your destination model in a tab (e.g., open **Claude**, **ChatGPT**, or **Gemini**).
-2. Open the AI to AI Side Panel.
+2. Open the PromptWarp Side Panel.
 3. Find your desired capsule.
 4. Click **"Inject"** (or drag the grip handle directly into the prompt box).
 5. The prompt context is automatically transferred directly into the active prompt textarea with zero manual copy-pasting!

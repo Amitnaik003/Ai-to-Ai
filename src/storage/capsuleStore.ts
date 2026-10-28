@@ -268,7 +268,7 @@ export const CapsuleStore = {
   async importJSON(jsonString: string): Promise<{ importedCount: number }> {
     const data = JSON.parse(jsonString);
     if (!data.capsules || !Array.isArray(data.capsules)) {
-      throw new Error("Invalid AI to AI JSON format.");
+      throw new Error("Invalid PromptWarp JSON format.");
     }
     const current = await this.getCapsules();
     const existingIds = new Set(current.map((c) => c.id));

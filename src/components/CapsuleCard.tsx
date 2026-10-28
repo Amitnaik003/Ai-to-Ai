@@ -286,6 +286,7 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
       content: activePayload,
       platform: capsule.platform
     });
+    e.dataTransfer.setData("application/x-promptwarp", payloadStr);
     e.dataTransfer.setData("application/x-ai-to-ai", payloadStr);
     e.dataTransfer.setData("application/x-capsule-hub", payloadStr);
     e.dataTransfer.effectAllowed = "copy";

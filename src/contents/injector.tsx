@@ -57,6 +57,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 if (typeof window !== "undefined") {
   window.addEventListener("dragover", (e) => {
     if (
+      e.dataTransfer?.types.includes("application/x-promptwarp") ||
       e.dataTransfer?.types.includes("application/x-ai-to-ai") ||
       e.dataTransfer?.types.includes("application/x-capsule-hub")
     ) {
@@ -67,6 +68,7 @@ if (typeof window !== "undefined") {
 
   window.addEventListener("drop", (e) => {
     const rawCapsule =
+      e.dataTransfer?.getData("application/x-promptwarp") ||
       e.dataTransfer?.getData("application/x-ai-to-ai") ||
       e.dataTransfer?.getData("application/x-capsule-hub");
     const rawText = e.dataTransfer?.getData("text/plain");
@@ -177,7 +179,7 @@ export default function FloatingCapsuleWidget() {
               >
                 <Sparkles size={12} />
               </div>
-              <span style={{ fontSize: "12px", fontWeight: 700, color: "#0f172a" }}>AI to AI</span>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: "#0f172a" }}>PromptWarp</span>
             </div>
             <button
               onClick={() => setIsOpen(false)}
@@ -258,7 +260,7 @@ export default function FloatingCapsuleWidget() {
       ) : (
         <button
           onClick={() => setIsOpen(true)}
-          title="AI to AI - Context Transfer"
+          title="PromptWarp - AI Context Teleporter"
           style={{
             display: "flex",
             alignItems: "center",

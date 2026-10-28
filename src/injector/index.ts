@@ -164,7 +164,7 @@ export function injectTextIntoElement(target: HTMLElement, text: string): boolea
 
     return false;
   } catch (err) {
-    console.error("AI to AI injection failed:", err);
+    console.error("PromptWarp injection failed:", err);
     return false;
   }
 }

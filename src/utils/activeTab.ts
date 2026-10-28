@@ -43,7 +43,7 @@ export async function injectCapsuleIntoActiveTab(text: string): Promise<{ succes
     return {
       success: false,
       error: result.error?.includes("Receiving end does not exist")
-        ? "Target page does not have AI to AI script loaded. Please refresh the tab or navigate to ChatGPT, Claude, Gemini, Perplexity, DeepSeek, or Gmail."
+        ? "Target page does not have PromptWarp script loaded. Please refresh the tab or navigate to ChatGPT, Claude, Gemini, Perplexity, DeepSeek, or Gmail."
         : result.error
     };
   }

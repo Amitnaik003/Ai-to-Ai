@@ -1,5 +1,5 @@
 /**
- * Favicon helper for AI to AI.
+ * Favicon helper for PromptWarp.
  * Sets the browser favicon using high-resolution extension icons or inline SVG data URI.
  */
 export const FAVICON_SVG_DATA_URI =

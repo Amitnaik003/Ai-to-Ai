@@ -1,9 +1,9 @@
 {
-  "name": "ai-to-ai",
-  "displayName": "AI to AI - Context Transfer Extension",
+  "name": "promptwarp",
+  "displayName": "PromptWarp - AI Context Teleporter",
   "version": "1.0.0",
-  "description": "Cross-platform context-transfer extension for ChatGPT, Claude, Gemini, Perplexity, DeepSeek, and Gmail with local-first library and smart injection.",
-  "author": "AI to AI",
+  "description": "Seamlessly warp prompts and multi-turn conversations between ChatGPT, Claude, Gemini, Perplexity, DeepSeek, and Gmail.",
+  "author": "PromptWarp",
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",
@@ -36,8 +36,8 @@
     "typescript": "^5.4.5"
   },
   "manifest": {
-    "name": "AI to AI - Context Transfer",
-    "description": "Seamlessly capture, categorize, and transfer prompt contexts between ChatGPT, Claude, Gemini, Perplexity, DeepSeek, and Gmail.",
+    "name": "PromptWarp - AI Context Teleporter",
+    "description": "Seamlessly warp prompts and multi-turn conversations between ChatGPT, Claude, Gemini, Perplexity, DeepSeek, and Gmail.",
     "version": "1.0.0",
     "permissions": [
       "storage",
@@ -60,7 +60,7 @@
       "default_path": "sidepanel.html"
     },
     "action": {
-      "default_title": "Open AI to AI"
+      "default_title": "Open PromptWarp"
     }
   },
   "optionalDependencies": {

@@ -13,13 +13,13 @@ chrome.runtime.onInstalled.addListener(() => {
   // Create context menus for instant capture
   chrome.contextMenus.create({
     id: "capsule-save-selection",
-    title: "Save Selection to AI to AI",
+    title: "Save Selection to PromptWarp",
     contexts: ["selection"]
   });
 
   chrome.contextMenus.create({
     id: "capsule-capture-page",
-    title: "Capture Entire LLM Chat to AI to AI",
+    title: "Capture Entire LLM Chat to PromptWarp",
     contexts: ["page"],
     documentUrlPatterns: [
       "*://chatgpt.com/*",
