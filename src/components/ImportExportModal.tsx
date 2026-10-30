@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { X, Download, Upload, Trash2 } from "lucide-react";
+import { X, Download, Upload, Trash2, FileText } from "lucide-react";
 import type { Capsule } from "../types";
+import { downloadBatchAsMarkdown } from "../utils/fileExporter";
 
 interface ImportExportModalProps {
   isOpen: boolean;
@@ -41,6 +42,19 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
       onShowToast("Backup downloaded successfully!", "success");
     } catch (err: any) {
       onShowToast(err.message || "Failed to export data", "error");
+    }
+  };
+
+  const handleDownloadMarkdown = () => {
+    try {
+      if (capsules.length === 0) {
+        onShowToast("No contexts to export", "info");
+        return;
+      }
+      downloadBatchAsMarkdown(capsules);
+      onShowToast("All contexts downloaded as Markdown!", "success");
+    } catch (err: any) {
+      onShowToast(err.message || "Failed to export Markdown", "error");
     }
   };
 
@@ -104,13 +118,22 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
             <p className="text-[11px] text-slate-500 mb-2.5">
               Export all {capsules.length} saved contexts to a portable JSON backup.
             </p>
-            <button
-              onClick={handleDownload}
-              className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download JSON Backup</span>
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleDownload}
+                className="flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-indigo-600" />
+                <span>JSON Backup</span>
+              </button>
+              <button
+                onClick={handleDownloadMarkdown}
+                className="flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs transition cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Markdown (.md)</span>
+              </button>
+            </div>
           </div>
 
           {/* Import Box */}

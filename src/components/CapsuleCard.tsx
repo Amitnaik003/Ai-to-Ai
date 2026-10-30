@@ -14,12 +14,23 @@ import {
   GripVertical,
   MessageSquare,
   ShieldAlert,
-  ShieldCheck
+  ShieldCheck,
+  Download,
+  Clock,
+  CheckSquare,
+  Square,
+  FileCode,
+  Sparkles
 } from "lucide-react";
 import type { Capsule, PlatformType } from "../types";
 import { injectCapsuleIntoActiveTab } from "../utils/activeTab";
 import { buildStructuredContext, getConversationStats } from "../utils/contextFormatter";
 import { scanSecurity, redactSensitiveData } from "../utils/securityScanner";
+import {
+  downloadCapsuleAsMarkdown,
+  downloadCapsuleAsJSON,
+  formatCapsuleToMarkdown
+} from "../utils/fileExporter";
 
 interface CapsuleCardProps {
   capsule: Capsule;
@@ -28,6 +39,9 @@ interface CapsuleCardProps {
   onTogglePin: (id: string) => void;
   onShowToast: (msg: string, type?: "success" | "error" | "info") => void;
   onUpdateCapsule?: (capsule: Capsule) => Promise<Capsule | void>;
+  isBatchMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
 const PLATFORM_META: Record<
@@ -94,9 +108,20 @@ const PLATFORM_META: Record<
 
 /* ─── Overflow Menu ────────────────────────────────────────────────────── */
 const OverflowMenu: React.FC<{
+  capsule: Capsule;
   onEdit: () => void;
   onDelete: () => void;
-}> = ({ onEdit, onDelete }) => {
+  onCopyMarkdown: () => void;
+  onDownloadMarkdown: () => void;
+  onDownloadJSON: () => void;
+}> = ({
+  capsule,
+  onEdit,
+  onDelete,
+  onCopyMarkdown,
+  onDownloadMarkdown,
+  onDownloadJSON
+}) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -113,25 +138,67 @@ const OverflowMenu: React.FC<{
       <button
         onClick={() => setOpen((v) => !v)}
         className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-        title="More options"
+        title="More actions"
       >
         <MoreHorizontal className="w-3.5 h-3.5" />
       </button>
 
       {open && (
-        <div className="absolute right-0 top-7 z-30 bg-white border border-slate-200 rounded-xl shadow-xl py-1 w-36 animate-fade-in text-xs">
+        <div className="absolute right-0 top-7 z-30 bg-white border border-slate-200 rounded-xl shadow-xl py-1 w-44 animate-fade-in text-xs">
           <button
-            onClick={() => { onEdit(); setOpen(false); }}
+            onClick={() => {
+              onEdit();
+              setOpen(false);
+            }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
           >
-            <Edit2 className="w-3.5 h-3.5" />
-            <span>Edit</span>
+            <Edit2 className="w-3.5 h-3.5 text-slate-400" />
+            <span>Edit Context</span>
+          </button>
+
+          <button
+            onClick={() => {
+              onCopyMarkdown();
+              setOpen(false);
+            }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
+          >
+            <Copy className="w-3.5 h-3.5 text-slate-400" />
+            <span>Copy as Markdown</span>
+          </button>
+
+          <div className="my-1 border-t border-slate-100" />
+
+          {/* Desktop Downloads */}
+          <button
+            onClick={() => {
+              onDownloadMarkdown();
+              setOpen(false);
+            }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-indigo-600 hover:bg-indigo-50 font-medium transition"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Save as .md</span>
+          </button>
+
+          <button
+            onClick={() => {
+              onDownloadJSON();
+              setOpen(false);
+            }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-600 hover:bg-slate-50 transition"
+          >
+            <FileCode className="w-3.5 h-3.5 text-slate-400" />
+            <span>Save as .json</span>
           </button>
 
           <div className="my-1 border-t border-slate-100" />
 
           <button
-            onClick={() => { onDelete(); setOpen(false); }}
+            onClick={() => {
+              onDelete();
+              setOpen(false);
+            }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-rose-600 hover:bg-rose-50 transition"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -150,22 +217,26 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
   onDelete,
   onTogglePin,
   onShowToast,
-  onUpdateCapsule
+  onUpdateCapsule,
+  isBatchMode = false,
+  isSelected = false,
+  onToggleSelect
 }) => {
   const [copied, setCopied] = useState(false);
   const [injecting, setInjecting] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [showSecurityDetails, setShowSecurityDetails] = useState(false);
 
   const meta = PLATFORM_META[capsule.platform] || PLATFORM_META.manual;
 
-  // Turn metrics
+  // Turn metrics, word count, reading time
   const stats = useMemo(
     () => getConversationStats(capsule.messages || capsule.content),
     [capsule.messages, capsule.content]
   );
 
-  // Structured XML sequence
+  // Structured XML sequence for LLM ingestion
   const structuredSequence = useMemo(() => {
     const res = buildStructuredContext(capsule.messages || capsule.content, {
       formatMode: "xml",
@@ -197,11 +268,12 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
         updatedAt: new Date().toISOString()
       };
       await onUpdateCapsule(updated);
+      setShowSecurityDetails(false);
       onShowToast(`Masked ${redactedCount} sensitive credential(s)! 🛡️`, "success");
     }
   };
 
-  // Copy to clipboard
+  // Copy to clipboard as structured XML
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(activePayload);
@@ -210,6 +282,37 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
       setTimeout(() => setCopied(false), 2000);
     } catch {
       onShowToast("Failed to copy context", "error");
+    }
+  };
+
+  // Copy to clipboard as clean Markdown
+  const handleCopyMarkdown = async () => {
+    try {
+      const md = formatCapsuleToMarkdown(capsule);
+      await navigator.clipboard.writeText(md);
+      onShowToast("Copied as formatted Markdown!", "success");
+    } catch {
+      onShowToast("Failed to copy Markdown", "error");
+    }
+  };
+
+  // Direct Desktop Download (.md)
+  const handleDownloadMarkdown = () => {
+    try {
+      downloadCapsuleAsMarkdown(capsule);
+      onShowToast("Saved .md file to your desktop downloads!", "success");
+    } catch (err: any) {
+      onShowToast(err.message || "Failed to download Markdown", "error");
+    }
+  };
+
+  // Direct Desktop Download (.json)
+  const handleDownloadJSON = () => {
+    try {
+      downloadCapsuleAsJSON(capsule);
+      onShowToast("Saved .json backup to your desktop downloads!", "success");
+    } catch (err: any) {
+      onShowToast(err.message || "Failed to download JSON", "error");
     }
   };
 
@@ -240,6 +343,10 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
 
   // HTML5 Drag and Drop context transfer
   const handleDragStart = (e: React.DragEvent) => {
+    if (isBatchMode) {
+      e.preventDefault();
+      return;
+    }
     setIsDragging(true);
     e.dataTransfer.setData("text/plain", activePayload);
     const payloadStr = JSON.stringify({
@@ -260,11 +367,15 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
 
   return (
     <article
-      draggable
+      draggable={!isBatchMode}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      className={`group relative bg-white rounded-xl border border-slate-200/90 shadow-2xs hover:shadow-md transition-all overflow-hidden ${
-        capsule.isPinned ? "bg-amber-50/10 border-amber-200/70" : ""
+      className={`group relative bg-white rounded-xl border transition-all overflow-hidden ${
+        isSelected
+          ? "border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/10"
+          : capsule.isPinned
+          ? "border-amber-300/80 bg-amber-50/10 shadow-2xs"
+          : "border-slate-200/90 shadow-2xs hover:shadow-md hover:border-slate-300"
       } ${isDragging ? "opacity-40 scale-[0.99] border-dashed border-indigo-400" : ""}`}
     >
       {/* Platform color stripe */}
@@ -273,15 +384,28 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
       {/* Card Header */}
       <div className="p-3 pb-2">
         <div className="flex items-center justify-between gap-1 mb-1.5">
-          {/* Left: Drag Handle + Platform Badge + Turns Count */}
+          {/* Left: Batch Checkbox OR Drag Handle + Platform Badge + Metrics */}
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-            {/* Drag Handle */}
-            <div
-              title="Drag & drop this context directly into any AI chat input"
-              className="p-0.5 -ml-1 text-slate-300 hover:text-indigo-600 cursor-grab active:cursor-grabbing transition"
-            >
-              <GripVertical className="w-3.5 h-3.5" />
-            </div>
+            {isBatchMode ? (
+              <button
+                type="button"
+                onClick={() => onToggleSelect && onToggleSelect(capsule.id)}
+                className="p-0.5 -ml-1 text-indigo-600 hover:text-indigo-800 cursor-pointer"
+              >
+                {isSelected ? (
+                  <CheckSquare className="w-4 h-4 fill-indigo-50 text-indigo-600" />
+                ) : (
+                  <Square className="w-4 h-4 text-slate-400" />
+                )}
+              </button>
+            ) : (
+              <div
+                title="Drag & drop this context directly into any AI chat input"
+                className="p-0.5 -ml-1 text-slate-300 hover:text-indigo-600 cursor-grab active:cursor-grabbing transition"
+              >
+                <GripVertical className="w-3.5 h-3.5" />
+              </div>
+            )}
 
             {/* Platform pill */}
             <span
@@ -300,15 +424,28 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
               <span>{stats.label}</span>
             </span>
 
+            {/* Reading Time / Words metric (Zero tokens!) */}
+            {stats.wordCount > 0 && (
+              <span
+                title={`${stats.wordCount.toLocaleString()} words · ~${stats.readingTimeMin} min read time`}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] text-slate-500 bg-slate-50 border border-slate-200/60 font-medium"
+              >
+                <Clock className="w-2.5 h-2.5 text-slate-400" />
+                <span>{stats.wordCount > 999 ? `${(stats.wordCount / 1000).toFixed(1)}k words` : `${stats.wordCount} words`}</span>
+              </span>
+            )}
+
             {/* Security Alert Badge */}
             {!securityAudit.isSecure && (
-              <span
-                title={`Security Alert: ${securityAudit.totalSecrets} credential(s) detected: ${securityAudit.findings.map((f) => f.label).join(", ")}`}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200"
+              <button
+                type="button"
+                onClick={() => setShowSecurityDetails(!showSecurityDetails)}
+                title={`Click to view and mask ${securityAudit.totalSecrets} detected secret(s)`}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer"
               >
                 <ShieldAlert className="w-2.5 h-2.5 text-rose-600" />
                 <span>{securityAudit.totalSecrets} Secret{securityAudit.totalSecrets > 1 ? "s" : ""}</span>
-              </span>
+              </button>
             )}
           </div>
 
@@ -329,8 +466,12 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
 
             {/* Overflow */}
             <OverflowMenu
+              capsule={capsule}
               onEdit={() => onEdit(capsule)}
               onDelete={() => onDelete(capsule.id)}
+              onCopyMarkdown={handleCopyMarkdown}
+              onDownloadMarkdown={handleDownloadMarkdown}
+              onDownloadJSON={handleDownloadJSON}
             />
           </div>
         </div>
@@ -362,16 +503,44 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
         )}
       </div>
 
+      {/* Security Details Popover Drawer */}
+      {showSecurityDetails && !securityAudit.isSecure && (
+        <div className="border-t border-rose-100 bg-rose-50/60 p-2.5 animate-fade-in text-xs space-y-2">
+          <div className="flex items-center justify-between text-[11px] font-bold text-rose-800">
+            <span className="flex items-center gap-1">
+              <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
+              <span>Detected Secrets ({securityAudit.totalSecrets})</span>
+            </span>
+            {onUpdateCapsule && (
+              <button
+                onClick={handleMaskSecrets}
+                className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[10px] shadow-2xs transition cursor-pointer"
+              >
+                Mask All
+              </button>
+            )}
+          </div>
+          <div className="space-y-1">
+            {securityAudit.findings.map((f, idx) => (
+              <div key={idx} className="flex items-center justify-between bg-white/80 p-1.5 rounded border border-rose-200/80 text-[10px]">
+                <span className="font-semibold text-rose-900">{f.label}</span>
+                <code className="text-[9px] text-slate-600 bg-slate-100 px-1 py-0.2 rounded font-mono">{f.snippet}</code>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Expanded Turn Preview */}
       {expanded && (
         <div className="border-t border-slate-100 bg-slate-50/70 p-2.5 animate-fade-in text-xs space-y-2">
           <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold px-0.5">
             <span className="flex items-center gap-1">
               <ListOrdered className="w-3 h-3 text-indigo-500" />
-              <span>{stats.totalMessages} Turns Sequence</span>
+              <span>{stats.detailedLabel}</span>
             </span>
             <span className="text-[10px] text-slate-400">
-              {activePayload.length.toLocaleString()} chars
+              {stats.charCount.toLocaleString()} chars · ~{stats.readingTimeMin}m read
             </span>
           </div>
 
@@ -393,24 +562,22 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
           {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
 
-        {/* Right: Copy & Inject Actions */}
+        {/* Right: Quick Markdown Save + Copy & Inject Actions */}
         <div className="flex items-center gap-1.5">
-          {/* Mask Secrets Action (if secrets detected) */}
-          {!securityAudit.isSecure && onUpdateCapsule && (
-            <button
-              onClick={handleMaskSecrets}
-              title="Redact detected API keys and secrets"
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 transition cursor-pointer"
-            >
-              <ShieldCheck className="w-3 h-3 text-amber-600" />
-              <span>Mask Secrets</span>
-            </button>
-          )}
+          {/* Quick Markdown Download */}
+          <button
+            onClick={handleDownloadMarkdown}
+            title="Download context directly as a Markdown .md file to your desktop"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition cursor-pointer"
+          >
+            <Download className="w-3 h-3 text-slate-500" />
+            <span className="hidden sm:inline">.md</span>
+          </button>
 
           {/* Copy Button */}
           <button
             onClick={handleCopy}
-            title="Copy formatted context"
+            title="Copy structured context to clipboard"
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition cursor-pointer"
           >
             {copied ? (

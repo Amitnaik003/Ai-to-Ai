@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, Sparkles, Database, Cpu, MessageSquare, ShieldAlert } from "lucide-react";
+import { Plus, Sparkles, Database, Cpu, MessageSquare, ShieldAlert, CheckSquare, Layers } from "lucide-react";
 
 interface HeaderProps {
   onNewCapsule: () => void;
@@ -9,6 +9,10 @@ interface HeaderProps {
   totalCapsules: number;
   totalMessages?: number;
   totalSecurityAlerts?: number;
+  totalWords?: number;
+  isBatchMode?: boolean;
+  onToggleBatchMode?: () => void;
+  selectedCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -18,12 +22,16 @@ export const Header: React.FC<HeaderProps> = ({
   isCapturing,
   totalCapsules,
   totalMessages,
-  totalSecurityAlerts
+  totalSecurityAlerts,
+  totalWords,
+  isBatchMode = false,
+  onToggleBatchMode,
+  selectedCount = 0
 }) => {
   return (
     <header className="sticky top-0 z-20 bg-white/96 backdrop-blur-md border-b border-slate-200/80">
       {/* Main header row */}
-      <div className="flex items-center justify-between px-3 pt-2 pb-2">
+      <div className="flex items-center justify-between px-3 pt-2.5 pb-2">
         {/* Logo + Branding */}
         <div className="flex items-center gap-2">
           <div className="relative w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-300/40 shrink-0">
@@ -41,9 +49,9 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 mt-0.5">
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
               <span className="text-[10px] text-slate-500 font-medium">
-                {totalCapsules} {totalCapsules === 1 ? "capsule" : "capsules"}
+                {totalCapsules} {totalCapsules === 1 ? "context" : "contexts"}
               </span>
 
               {totalMessages !== undefined && totalMessages > 0 && (
@@ -55,6 +63,18 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     <MessageSquare className="w-2.5 h-2.5 fill-indigo-500 text-indigo-500" />
                     <span>{totalMessages} {totalMessages === 1 ? "turn" : "turns"}</span>
+                  </span>
+                </>
+              )}
+
+              {totalWords !== undefined && totalWords > 0 && (
+                <>
+                  <span className="w-px h-2.5 bg-slate-200" />
+                  <span
+                    title={`Total words in library: ${totalWords.toLocaleString()}`}
+                    className="text-[10px] text-slate-400 font-medium"
+                  >
+                    {totalWords > 999 ? `${(totalWords / 1000).toFixed(1)}k words` : `${totalWords} words`}
                   </span>
                 </>
               )}
@@ -77,6 +97,21 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-1">
+          {/* Batch Mode Toggle */}
+          {totalCapsules > 0 && onToggleBatchMode && (
+            <button
+              onClick={onToggleBatchMode}
+              title={isBatchMode ? "Exit multi-select mode" : "Select multiple contexts for batch actions"}
+              className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                isBatchMode
+                  ? "bg-indigo-50 text-indigo-600 border-indigo-200"
+                  : "text-slate-400 hover:text-slate-700 hover:bg-slate-100 border-transparent hover:border-slate-200"
+              }`}
+            >
+              <CheckSquare className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           {/* Capture */}
           <button
             onClick={onCaptureCurrentTab}
@@ -123,7 +158,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Gradient accent line */}
-      <div className="header-accent" />
+      <div className="h-[1.5px] w-full bg-gradient-to-r from-indigo-500 via-violet-500 to-transparent opacity-40" />
     </header>
   );
 };

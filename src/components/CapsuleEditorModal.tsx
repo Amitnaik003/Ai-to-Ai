@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { X, Save, Sparkles, RotateCcw, CheckCircle2, MessageSquare } from "lucide-react";
+import {
+  X,
+  Save,
+  Sparkles,
+  RotateCcw,
+  CheckCircle2,
+  MessageSquare,
+  ShieldAlert,
+  ShieldCheck,
+  Clock,
+  FileText
+} from "lucide-react";
 import type { Capsule, PlatformType } from "../types";
 import {
   buildStructuredContext,
@@ -7,6 +18,7 @@ import {
   cleanTextContent,
   StructureFormatMode
 } from "../utils/contextFormatter";
+import { scanSecurity, redactSensitiveData } from "../utils/securityScanner";
 
 interface CapsuleEditorModalProps {
   capsule: Capsule | null;
@@ -48,9 +60,12 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
     setFeedback(null);
   }, [capsule, isOpen]);
 
-  if (!isOpen) return null;
-
   const stats = useMemo(() => getConversationStats(content), [content]);
+
+  // Real-time security audit for pasted content
+  const securityAudit = useMemo(() => scanSecurity(content), [content]);
+
+  if (!isOpen) return null;
 
   const handleStructureAndSequence = (mode: StructureFormatMode = "xml", aggressive = false) => {
     if (!content.trim()) return;
@@ -65,7 +80,7 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
     });
 
     setFeedback({
-      message: "Context structured and ordered cleanly!",
+      message: `Context formatted as ${mode.toUpperCase()}!`,
       prevContent: content
     });
     setContent(result.optimized);
@@ -75,10 +90,21 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
     if (!content.trim()) return;
     const cleaned = cleanTextContent(content);
     setFeedback({
-      message: "Cleaned whitespace and trailing fluff!",
+      message: "Cleaned whitespace and conversational filler!",
       prevContent: content
     });
     setContent(cleaned);
+  };
+
+  const handleMaskSecrets = () => {
+    const { sanitized, redactedCount } = redactSensitiveData(content);
+    if (redactedCount > 0) {
+      setFeedback({
+        message: `Masked ${redactedCount} sensitive credential(s)!`,
+        prevContent: content
+      });
+      setContent(sanitized);
+    }
   };
 
   const handleUndo = () => {
@@ -160,7 +186,7 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
           {/* Platform Selector */}
           <div>
             <label className="block text-[11px] font-semibold text-slate-700 uppercase tracking-wide mb-1">
-              Target Platform
+              Source / Target Platform
             </label>
             <select
               value={platform}
@@ -212,26 +238,60 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
                 Prompt / Conversation Content *
               </label>
 
-              {/* Turn count & stats */}
+              {/* Turn count & word metrics (No tokens!) */}
               <div className="flex items-center gap-2 text-[10px] text-slate-500">
                 <span className="inline-flex items-center gap-1 font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
                   <MessageSquare className="w-2.5 h-2.5" />
                   <span>{stats.label}</span>
                 </span>
+                {stats.wordCount > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="w-2.5 h-2.5 text-slate-400" />
+                    <span>{stats.wordCount.toLocaleString()} words</span>
+                  </span>
+                )}
                 <span>{content.length.toLocaleString()} chars</span>
               </div>
             </div>
 
+            {/* Live Security Scanner Warning in Editor */}
+            {!securityAudit.isSecure && (
+              <div className="mb-2 p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-[11px] flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span className="font-semibold">
+                    Detected {securityAudit.totalSecrets} credential(s) ({securityAudit.findings.map((f) => f.label).join(", ")})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleMaskSecrets}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] shadow-2xs transition cursor-pointer"
+                >
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>Mask Now</span>
+                </button>
+              </div>
+            )}
+
             {/* Quick Formatting Toolbar */}
             <div className="flex items-center justify-between gap-1 mb-2 bg-slate-100/80 p-1.5 rounded-lg border border-slate-200/60">
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 flex-wrap">
                 <button
                   type="button"
                   onClick={() => handleStructureAndSequence("xml")}
                   title="Format into chronological XML turns"
                   className="px-2 py-1 rounded text-[10px] font-semibold bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200 shadow-2xs transition cursor-pointer"
                 >
-                  XML Turns
+                  XML
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleStructureAndSequence("markdown")}
+                  title="Format into clean Markdown with user/assistant headers"
+                  className="px-2 py-1 rounded text-[10px] font-semibold bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200 shadow-2xs transition cursor-pointer"
+                >
+                  Markdown
                 </button>
                 <button
                   type="button"
@@ -247,7 +307,7 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
                   title="Clean whitespace and trailing fluff"
                   className="px-2 py-1 rounded text-[10px] font-semibold bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 shadow-2xs transition cursor-pointer"
                 >
-                  Clean Whitespace
+                  Clean Fluff
                 </button>
               </div>
 

@@ -4,7 +4,9 @@ import { findActivePromptInput, injectTextIntoElement } from "../injector";
 import { extractCurrentPageChat, detectCurrentPlatform } from "../scrapers";
 import { CapsuleStore } from "../storage/capsuleStore";
 import { buildStructuredContext } from "../utils/contextFormatter";
-import { Sparkles, ArrowRight, X } from "lucide-react";
+import { downloadCapsuleAsMarkdown } from "../utils/fileExporter";
+import { Sparkles, ArrowRight, X, Download } from "lucide-react";
+import type { Capsule } from "../types";
 
 export const config: PlasmoCSConfig = {
   matches: [
@@ -144,6 +146,43 @@ export default function FloatingCapsuleWidget() {
     }
   };
 
+  const handleDirectDownload = () => {
+    setStatus("Generating Markdown...");
+    try {
+      const extracted = extractCurrentPageChat();
+      const rawContent = extracted.content || "";
+      const structured = buildStructuredContext(extracted.messages || rawContent, {
+        formatMode: "xml",
+        sourcePlatform: platform.toUpperCase(),
+        title: extracted.title || "Quick Capture",
+        summary: extracted.summary || "Conversation capture",
+        includeHandoff: true
+      });
+      const cap: Capsule = {
+        id: `cap-${Date.now()}`,
+        title: extracted.title || "Quick Capture",
+        summary: extracted.summary || "Conversation capture",
+        content: structured.optimized || rawContent,
+        messages: extracted.messages,
+        platform: extracted.platform || platform,
+        sourceUrl: window.location.href,
+        tags: [platform, "direct-export"],
+        isPinned: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      downloadCapsuleAsMarkdown(cap);
+      setStatus("Saved .md to Desktop!");
+      setTimeout(() => {
+        setStatus(null);
+        setIsOpen(false);
+      }, 2500);
+    } catch (err: any) {
+      setStatus("Download failed");
+      setTimeout(() => setStatus(null), 3000);
+    }
+  };
+
   const handleOpenSidePanel = () => {
     chrome.runtime.sendMessage({ type: "OPEN_SIDEPANEL" });
   };
@@ -241,7 +280,28 @@ export default function FloatingCapsuleWidget() {
                 }}
               >
                 <Sparkles size={12} />
-                <span>Capture Chat Context</span>
+                <span>Capture Context</span>
+              </button>
+
+              <button
+                onClick={handleDirectDownload}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  padding: "7px 12px",
+                  borderRadius: "8px",
+                  background: "#f0fdf4",
+                  color: "#166534",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  border: "1px solid #bbf7d0",
+                  cursor: "pointer"
+                }}
+              >
+                <Download size={12} />
+                <span>Save .md to Desktop</span>
               </button>
 
               <button

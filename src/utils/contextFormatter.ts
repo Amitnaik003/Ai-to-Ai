@@ -28,7 +28,7 @@ export interface FormattedResult {
   optimized: string;
 }
 
-export type StructureFormatMode = 'xml' | 'sequence' | 'compact';
+export type StructureFormatMode = 'xml' | 'sequence' | 'compact' | 'markdown';
 
 export interface StructureOptions {
   formatMode?: StructureFormatMode;
@@ -101,6 +101,10 @@ export interface ConversationStats {
   systemMessages: number;
   label: string;
   detailedLabel: string;
+  wordCount: number;
+  charCount: number;
+  readingTimeMin: number;
+  isMultiTurn: boolean;
 }
 
 /**
@@ -213,13 +217,23 @@ export function getConversationStats(turnsOrText: CapsuleMessage[] | string | un
     detailedLabel = `Empty conversation`;
   }
 
+  const fullText = turns.map((t) => t.text).join(" ") || (typeof turnsOrText === "string" ? turnsOrText : "");
+  const wordCount = fullText.trim() ? fullText.trim().split(/\s+/).filter(Boolean).length : 0;
+  const charCount = fullText.length;
+  const readingTimeMin = Math.max(1, Math.ceil(wordCount / 200));
+  const isMultiTurn = total > 1;
+
   return {
     totalMessages: total,
     userMessages,
     assistantMessages,
     systemMessages,
     label,
-    detailedLabel
+    detailedLabel,
+    wordCount,
+    charCount,
+    readingTimeMin,
+    isMultiTurn
   };
 }
 
@@ -290,6 +304,18 @@ export function buildStructuredContext(
     });
     if (includeHandoff) {
       lines.push(`--- Action ---\nPlease continue directly based on the context above.`);
+    }
+    formattedOutput = lines.join("\n");
+  } else if (formatMode === "markdown") {
+    const lines: string[] = [];
+    if (title) lines.push(`# ${title}\n`);
+    if (summary) lines.push(`> ${summary}\n`);
+    cleanedTurns.forEach((turn, idx) => {
+      const roleIcon = turn.role === "user" ? "👤 User" : turn.role === "system" ? "⚙️ System" : "🤖 Assistant";
+      lines.push(`### ${roleIcon} (Turn ${idx + 1})\n${turn.text}\n`);
+    });
+    if (includeHandoff) {
+      lines.push(`---\n*Continue conversation directly from the prompt above.*`);
     }
     formattedOutput = lines.join("\n");
   } else {

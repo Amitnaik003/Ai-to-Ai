@@ -33,6 +33,7 @@ export interface CapsuleFilter {
   platform: 'all' | PlatformType;
   pinnedOnly: boolean;
   securityAlertsOnly?: boolean;
+  turnType?: 'all' | 'prompts' | 'dialogues';
 }
 
 export interface SecurityFinding {
