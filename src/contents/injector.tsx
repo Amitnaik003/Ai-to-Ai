@@ -89,7 +89,18 @@ if (typeof window !== "undefined") {
 
     if (textToInject) {
       e.preventDefault();
-      const inputEl = findActivePromptInput();
+      let inputEl = findActivePromptInput();
+      if (!inputEl && e.target instanceof HTMLElement) {
+        if (
+          e.target.isContentEditable ||
+          e.target.tagName === "TEXTAREA" ||
+          e.target.tagName === "INPUT"
+        ) {
+          inputEl = e.target;
+        } else {
+          inputEl = e.target.closest("div[contenteditable='true'], textarea, rich-textarea") as HTMLElement;
+        }
+      }
       if (inputEl) {
         injectTextIntoElement(inputEl, textToInject);
       }

@@ -260,16 +260,25 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
 
   const handleMaskSecrets = async () => {
     const { sanitized, redactedCount } = redactSensitiveData(capsule.content);
-    if (redactedCount > 0 && onUpdateCapsule) {
+    let messagesRedacted = 0;
+    const updatedMessages = capsule.messages?.map((m) => {
+      const res = redactSensitiveData(m.text);
+      messagesRedacted += res.redactedCount;
+      return { ...m, text: res.sanitized };
+    });
+
+    const totalRedacted = redactedCount + messagesRedacted;
+    if (totalRedacted > 0 && onUpdateCapsule) {
       const updated: Capsule = {
         ...capsule,
         content: sanitized,
+        messages: updatedMessages,
         summary: capsule.summary ? redactSensitiveData(capsule.summary).sanitized : capsule.summary,
         updatedAt: new Date().toISOString()
       };
       await onUpdateCapsule(updated);
       setShowSecurityDetails(false);
-      onShowToast(`Masked ${redactedCount} sensitive credential(s)! 🛡️`, "success");
+      onShowToast(`Masked ${totalRedacted} sensitive credential(s)! 🛡️`, "success");
     }
   };
 

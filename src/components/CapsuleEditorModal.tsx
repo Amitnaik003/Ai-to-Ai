@@ -16,6 +16,7 @@ import {
   buildStructuredContext,
   getConversationStats,
   cleanTextContent,
+  parseRawTextToTurns,
   StructureFormatMode
 } from "../utils/contextFormatter";
 import { scanSecurity, redactSensitiveData } from "../utils/securityScanner";
@@ -127,6 +128,8 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
       ? summary.trim()
       : content.trim().slice(0, 140) + (content.length > 140 ? "..." : "");
 
+    const parsedMessages = parseRawTextToTurns(content.trim());
+
     const toSave: Capsule = {
       ...(capsule || {
         id: `cap-${Date.now()}`,
@@ -136,6 +139,7 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
       title: title.trim(),
       summary: generatedSummary,
       content: content.trim(),
+      messages: parsedMessages.length > 0 ? parsedMessages : undefined,
       platform,
       tags: parsedTags,
       updatedAt: new Date().toISOString()

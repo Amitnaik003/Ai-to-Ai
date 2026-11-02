@@ -30,9 +30,10 @@ export function tokenizeSearchQuery(query: string): string[] {
 /**
  * Extracts a contextual snippet around the first matched term.
  */
-function extractMatchingSnippet(text: string, term: string): string | undefined {
+function extractMatchingSnippet(text?: string, term?: string): string | undefined {
+  if (!text || !term) return undefined;
   const lower = text.toLowerCase();
-  const idx = lower.indexOf(term);
+  const idx = lower.indexOf(term.toLowerCase());
   if (idx === -1) return undefined;
 
   const start = Math.max(0, idx - 40);

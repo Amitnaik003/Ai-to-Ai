@@ -107,7 +107,19 @@ export function injectTextIntoElement(target: HTMLElement, text: string): boolea
       }
 
       if (!success || !target.innerText.includes(text.slice(0, 10))) {
-        // Fallback: Dispatch synthetic BeforeInput
+        // Fallback 1A: Dispatch synthetic ClipboardEvent paste (supported by Lexical & ProseMirror)
+        try {
+          const dt = new DataTransfer();
+          dt.setData("text/plain", text);
+          const pasteEvent = new ClipboardEvent("paste", {
+            clipboardData: dt,
+            bubbles: true,
+            cancelable: true
+          });
+          target.dispatchEvent(pasteEvent);
+        } catch {}
+
+        // Fallback 1B: Dispatch synthetic BeforeInput
         try {
           const beforeInputEvent = new InputEvent("beforeinput", {
             bubbles: true,
@@ -118,13 +130,23 @@ export function injectTextIntoElement(target: HTMLElement, text: string): boolea
           target.dispatchEvent(beforeInputEvent);
         } catch {}
 
-        // Append text node directly into range
-        const textNode = document.createTextNode(text);
-        range.insertNode(textNode);
-        range.setStartAfter(textNode);
-        range.setEndAfter(textNode);
-        selection?.removeAllRanges();
-        selection?.addRange(range);
+        if (!target.innerText.includes(text.slice(0, 10))) {
+          // Fallback 1C: Insert paragraphs / text node directly with line break preservation
+          const lines = text.split("\n");
+          const fragment = document.createDocumentFragment();
+          lines.forEach((line, idx) => {
+            if (idx > 0) {
+              fragment.appendChild(document.createElement("br"));
+            }
+            if (line) {
+              fragment.appendChild(document.createTextNode(line));
+            }
+          });
+          range.insertNode(fragment);
+          range.collapse(false);
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+        }
       }
 
       // Notify modern framework state trackers

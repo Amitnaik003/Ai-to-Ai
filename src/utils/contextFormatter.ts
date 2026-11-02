@@ -108,6 +108,54 @@ export interface ConversationStats {
 }
 
 /**
+ * Matches turn headers across XML, Sequence separators, Markdown headings (with/without emojis), and standard transcripts.
+ */
+function detectTurnHeader(line: string): { role: "user" | "assistant" | "system"; remainder: string } | null {
+  const trimmed = line.trim();
+
+  // Ignore handoff instructions or actions
+  if (
+    /^---+\s*Action\s*---+/i.test(trimmed) ||
+    /<handoff_instruction>/i.test(trimmed) ||
+    /^\*Continue conversation/i.test(trimmed)
+  ) {
+    return null;
+  }
+
+  // Pattern A: Sequence separator, e.g. "--- Turn 1 (User) ---", "--- Turn 2 · Assistant ---"
+  const seqMatch = trimmed.match(/^---+\s*Turn\s*\d+\s*[\(·\-]\s*(User|Human|Assistant|AI|ChatGPT|Claude|Gemini|Perplexity|DeepSeek|System)\b/i);
+  if (seqMatch) {
+    const r = seqMatch[1].toLowerCase();
+    const role: "user" | "assistant" | "system" =
+      r === "user" || r === "human" ? "user" : r === "system" ? "system" : "assistant";
+    return { role, remainder: "" };
+  }
+
+  // Pattern B: Markdown heading with optional emojis & turn numbers:
+  // e.g. "### 👤 Turn 1 (User)", "### 🤖 Assistant (Turn 2)", "### User:", "## User"
+  const mdMatch = trimmed.match(/^#+\s*[^a-zA-Z0-9#\n]*(?:Turn\s*\d+[^a-zA-Z0-9#\n]*)?(User|Human|Assistant|AI|ChatGPT|Claude|Gemini|Perplexity|DeepSeek|System)\b(?:\s*[\):]|\s*\(Turn\s*\d+\))?/i);
+  if (mdMatch) {
+    const r = mdMatch[1].toLowerCase();
+    const role: "user" | "assistant" | "system" =
+      r === "user" || r === "human" ? "user" : r === "system" ? "system" : "assistant";
+    const remainder = trimmed.replace(/^#+\s*[^a-zA-Z0-9#\n]*(?:Turn\s*\d+[^a-zA-Z0-9#\n]*)?(User|Human|Assistant|AI|ChatGPT|Claude|Gemini|Perplexity|DeepSeek|System)\b(?:\s*[\):]|\s*\(Turn\s*\d+\))?[:\-]?\s*/i, "");
+    return { role, remainder };
+  }
+
+  // Pattern C: Standard transcript headers: "[User]:", "(User):", "User:", "Assistant:"
+  const stdMatch = trimmed.match(/^(?:\[|\()?(User|Human|Assistant|AI|ChatGPT|Claude|Gemini|Perplexity|DeepSeek|System)(?:\]|\))?:\s*/i);
+  if (stdMatch) {
+    const r = stdMatch[1].toLowerCase();
+    const role: "user" | "assistant" | "system" =
+      r === "user" || r === "human" ? "user" : r === "system" ? "system" : "assistant";
+    const remainder = trimmed.slice(stdMatch[0].length).trim();
+    return { role, remainder };
+  }
+
+  return null;
+}
+
+/**
  * Splits raw multi-turn conversation text into structured role turns.
  */
 export function parseRawTextToTurns(raw: string): CapsuleMessage[] {
@@ -131,18 +179,14 @@ export function parseRawTextToTurns(raw: string): CapsuleMessage[] {
     if (turns.length > 0) return turns;
   }
 
-  // 2. Parse standard dialogue headers: [User]:, Assistant:, User:, etc.
+  // 2. Parse sequence separators, markdown headings, or standard dialogue headers
   const lines = raw.split("\n");
-
-  const turnHeaderRegex =
-    /^(?:(?:\[|\()?(User|Human|Assistant|AI|ChatGPT|Claude|Gemini|Perplexity|DeepSeek|System)(?:\]|\))?:\s*|#+\s*(User|Human|Assistant|AI|ChatGPT|Claude|Gemini|Perplexity|DeepSeek|System)\b)/i;
-
   let currentRole: "user" | "assistant" | "system" = "user";
   let currentLines: string[] = [];
 
   for (const line of lines) {
-    const match = line.match(turnHeaderRegex);
-    if (match) {
+    const detected = detectTurnHeader(line);
+    if (detected) {
       if (currentLines.length > 0) {
         const text = currentLines.join("\n").trim();
         if (text) {
@@ -150,22 +194,15 @@ export function parseRawTextToTurns(raw: string): CapsuleMessage[] {
         }
         currentLines = [];
       }
-
-      const roleStr = (match[1] || match[2] || "").toLowerCase();
-      if (roleStr === "user" || roleStr === "human") {
-        currentRole = "user";
-      } else if (roleStr === "system") {
-        currentRole = "system";
-      } else {
-        currentRole = "assistant";
-      }
-
-      const remainder = line.replace(turnHeaderRegex, "").trim();
-      if (remainder) {
-        currentLines.push(remainder);
+      currentRole = detected.role;
+      if (detected.remainder) {
+        currentLines.push(detected.remainder);
       }
     } else {
-      currentLines.push(line);
+      // Check if line is handoff closing or action block to omit
+      if (!/^---+\s*Action\s*---+/i.test(line.trim()) && !/<handoff_instruction>/i.test(line) && !/<\/context_transfer>/i.test(line)) {
+        currentLines.push(line);
+      }
     }
   }
 

@@ -1,17 +1,22 @@
 import type { Capsule, CapsuleMessage } from "../types";
 
 /**
- * Extracts dialogue turns from capsule messages or XML content.
+ * Extracts dialogue turns from capsule messages, XML tags, or dialogue headers.
  */
 function extractDialogueTurns(capsule: Capsule): CapsuleMessage[] {
   if (capsule.messages && capsule.messages.length > 0) {
     return capsule.messages;
   }
+  const raw = capsule.content || "";
+  if (!raw.trim()) return [];
+
   const turns: CapsuleMessage[] = [];
-  if (capsule.content && capsule.content.includes("<turn")) {
+
+  // 1. XML turns
+  if (raw.includes("<turn")) {
     const xmlTurnRegex = /<turn\b[^>]*?\brole=["'](user|assistant|system)["'][^>]*>([\s\S]*?)<\/turn>/gi;
     let match;
-    while ((match = xmlTurnRegex.exec(capsule.content)) !== null) {
+    while ((match = xmlTurnRegex.exec(raw)) !== null) {
       const roleStr = match[1].toLowerCase();
       const role: "user" | "assistant" | "system" =
         roleStr === "user" ? "user" : roleStr === "system" ? "system" : "assistant";
@@ -20,7 +25,57 @@ function extractDialogueTurns(capsule: Capsule): CapsuleMessage[] {
         turns.push({ role, text });
       }
     }
+    if (turns.length > 0) return turns;
   }
+
+  // 2. Sequence or Dialogue headers
+  const lines = raw.split("\n");
+  let currentRole: "user" | "assistant" | "system" = "user";
+  let currentLines: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    let headerRole: "user" | "assistant" | "system" | null = null;
+    let remainder = "";
+
+    const seqMatch = trimmed.match(/^---+\s*Turn\s*\d+\s*[\(·\-]\s*(User|Human|Assistant|AI|ChatGPT|Claude|Gemini|Perplexity|DeepSeek|System)\b/i);
+    if (seqMatch) {
+      const r = seqMatch[1].toLowerCase();
+      headerRole = r === "user" || r === "human" ? "user" : r === "system" ? "system" : "assistant";
+    } else {
+      const mdMatch = trimmed.match(/^#+\s*[^a-zA-Z0-9#\n]*(?:Turn\s*\d+[^a-zA-Z0-9#\n]*)?(User|Human|Assistant|AI|ChatGPT|Claude|Gemini|Perplexity|DeepSeek|System)\b(?:\s*[\):]|\s*\(Turn\s*\d+\))?/i);
+      if (mdMatch) {
+        const r = mdMatch[1].toLowerCase();
+        headerRole = r === "user" || r === "human" ? "user" : r === "system" ? "system" : "assistant";
+        remainder = trimmed.replace(/^#+\s*[^a-zA-Z0-9#\n]*(?:Turn\s*\d+[^a-zA-Z0-9#\n]*)?(User|Human|Assistant|AI|ChatGPT|Claude|Gemini|Perplexity|DeepSeek|System)\b(?:\s*[\):]|\s*\(Turn\s*\d+\))?[:\-]?\s*/i, "");
+      } else {
+        const stdMatch = trimmed.match(/^(?:\[|\()?(User|Human|Assistant|AI|ChatGPT|Claude|Gemini|Perplexity|DeepSeek|System)(?:\]|\))?:\s*/i);
+        if (stdMatch) {
+          const r = stdMatch[1].toLowerCase();
+          headerRole = r === "user" || r === "human" ? "user" : r === "system" ? "system" : "assistant";
+          remainder = trimmed.slice(stdMatch[0].length).trim();
+        }
+      }
+    }
+
+    if (headerRole) {
+      if (currentLines.length > 0) {
+        const text = currentLines.join("\n").trim();
+        if (text) turns.push({ role: currentRole, text });
+        currentLines = [];
+      }
+      currentRole = headerRole;
+      if (remainder) currentLines.push(remainder);
+    } else {
+      currentLines.push(line);
+    }
+  }
+
+  if (currentLines.length > 0) {
+    const text = currentLines.join("\n").trim();
+    if (text) turns.push({ role: currentRole, text });
+  }
+
   return turns;
 }
 

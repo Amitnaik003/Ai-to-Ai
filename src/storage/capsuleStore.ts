@@ -75,6 +75,13 @@ export const CapsuleStore = {
     await safeSet(CAPSULES_KEY, filtered);
   },
 
+  async deleteCapsules(ids: string[]): Promise<void> {
+    const idSet = new Set(ids);
+    const items = await this.getCapsules();
+    const filtered = items.filter((c) => !idSet.has(c.id));
+    await safeSet(CAPSULES_KEY, filtered);
+  },
+
   async clearAll(): Promise<void> {
     await safeSet(CAPSULES_KEY, []);
   },
@@ -82,6 +89,13 @@ export const CapsuleStore = {
   async togglePin(id: string): Promise<void> {
     const items = await this.getCapsules();
     const updated = items.map((c) => (c.id === id ? { ...c, isPinned: !c.isPinned } : c));
+    await safeSet(CAPSULES_KEY, updated);
+  },
+
+  async togglePinCapsules(ids: string[]): Promise<void> {
+    const idSet = new Set(ids);
+    const items = await this.getCapsules();
+    const updated = items.map((c) => (idSet.has(c.id) ? { ...c, isPinned: !c.isPinned } : c));
     await safeSet(CAPSULES_KEY, updated);
   },
 
@@ -192,12 +206,20 @@ export function useCapsuleStore() {
       await CapsuleStore.deleteCapsule(id);
       await refresh();
     },
+    deleteCapsules: async (ids: string[]) => {
+      await CapsuleStore.deleteCapsules(ids);
+      await refresh();
+    },
     clearAll: async () => {
       await CapsuleStore.clearAll();
       await refresh();
     },
     togglePin: async (id: string) => {
       await CapsuleStore.togglePin(id);
+      await refresh();
+    },
+    togglePinCapsules: async (ids: string[]) => {
+      await CapsuleStore.togglePinCapsules(ids);
       await refresh();
     },
     exportJSON: CapsuleStore.exportJSON,

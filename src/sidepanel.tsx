@@ -41,8 +41,10 @@ export default function SidePanel() {
     loading,
     saveCapsule,
     deleteCapsule,
+    deleteCapsules,
     clearAll,
     togglePin,
+    togglePinCapsules,
     exportJSON,
     importJSON
   } = useCapsuleStore();
@@ -278,13 +280,12 @@ export default function SidePanel() {
 
   const handleBatchDelete = async () => {
     if (selectedIds.size === 0) return;
-    const confirm = window.confirm(`Delete ${selectedIds.size} selected context(s)? This cannot be undone.`);
+    const count = selectedIds.size;
+    const confirm = window.confirm(`Delete ${count} selected context(s)? This cannot be undone.`);
     if (!confirm) return;
 
-    for (const id of Array.from(selectedIds)) {
-      await deleteCapsule(id);
-    }
-    showToast(`Deleted ${selectedIds.size} context(s)`, "info");
+    await deleteCapsules(Array.from(selectedIds));
+    showToast(`Deleted ${count} context(s)`, "info");
     setSelectedIds(new Set());
     setIsBatchMode(false);
   };
@@ -311,9 +312,7 @@ export default function SidePanel() {
 
   const handleBatchTogglePin = async () => {
     if (selectedCapsules.length === 0) return;
-    for (const c of selectedCapsules) {
-      await togglePin(c.id);
-    }
+    await togglePinCapsules(Array.from(selectedIds));
     showToast(`Updated pin status for ${selectedCapsules.length} contexts`, "success");
   };
 

@@ -10,27 +10,29 @@ chrome.runtime.onInstalled.addListener(() => {
       .catch((err) => console.warn("Failed to set openPanelOnActionClick:", err));
   }
 
-  // Create context menus for instant capture
-  chrome.contextMenus.create({
-    id: "capsule-save-selection",
-    title: "Save Selection to PromptWarp",
-    contexts: ["selection"]
-  });
+  // Create context menus for instant capture (clear first to prevent duplicate ID runtime errors)
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: "capsule-save-selection",
+      title: "Save Selection to PromptWarp",
+      contexts: ["selection"]
+    });
 
-  chrome.contextMenus.create({
-    id: "capsule-capture-page",
-    title: "Capture Entire LLM Chat to PromptWarp",
-    contexts: ["page"],
-    documentUrlPatterns: [
-      "*://chatgpt.com/*",
-      "*://*.chatgpt.com/*",
-      "*://claude.ai/*",
-      "*://gemini.google.com/*",
-      "*://perplexity.ai/*",
-      "*://*.perplexity.ai/*",
-      "*://chat.deepseek.com/*",
-      "*://mail.google.com/*"
-    ]
+    chrome.contextMenus.create({
+      id: "capsule-capture-page",
+      title: "Capture Entire LLM Chat to PromptWarp",
+      contexts: ["page"],
+      documentUrlPatterns: [
+        "*://chatgpt.com/*",
+        "*://*.chatgpt.com/*",
+        "*://claude.ai/*",
+        "*://gemini.google.com/*",
+        "*://perplexity.ai/*",
+        "*://*.perplexity.ai/*",
+        "*://chat.deepseek.com/*",
+        "*://mail.google.com/*"
+      ]
+    });
   });
 });
 

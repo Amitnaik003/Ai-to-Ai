@@ -114,7 +114,7 @@ const SECURITY_RULES: PatternRule[] = [
     type: "credential",
     label: "Hardcoded Password / Secret",
     regex: /(?:password|client_secret|api_secret|auth_token)\s*[:=]\s*["']([^"'\s]{8,})["']/gi,
-    maskReplacement: (m) => m.replace(/[:=]\s*["'].*?["']/, '="••••••••[REDACTED]"')
+    maskReplacement: (m) => m.replace(/([:=]\s*["']).*?(["'])/, '$1••••••••[REDACTED]$2')
   }
 ];
 
