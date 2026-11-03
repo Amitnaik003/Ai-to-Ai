@@ -359,23 +359,34 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
         return;
       }
 
-      const extractedMessages = result.capsule.messages || [];
-      const assistantMsg = extractedMessages.find((m: any) => m.role === "assistant");
-      if (!assistantMsg) {
+      const extractedMessages: CapsuleMessage[] = result.capsule.messages || [];
+      const hasAssistant = extractedMessages.some((m) => m.role === "assistant");
+      if (!hasAssistant) {
         onShowToast("No AI response found on active tab yet. Wait for ChatGPT to finish!", "info");
         return;
       }
 
+      // If active tab has full conversation turns (user + assistant), use them;
+      // otherwise append assistant messages to existing user prompt
       const existingUserTurns = (capsule.messages || []).filter((m) => m.role === "user");
       const updatedMessages: CapsuleMessage[] =
-        existingUserTurns.length > 0
-          ? [...existingUserTurns, assistantMsg]
+        extractedMessages.length >= 2
+          ? extractedMessages
+          : existingUserTurns.length > 0
+          ? [...existingUserTurns, ...extractedMessages.filter((m) => m.role === "assistant")]
           : extractedMessages;
+
+      const userMsgs = updatedMessages.filter((m) => m.role === "user");
+      const asstMsgs = updatedMessages.filter((m) => m.role === "assistant");
+      const updatedSummary =
+        userMsgs.length > 0 && asstMsgs.length > 0
+          ? `Prompt: "${userMsgs[0].text.slice(0, 80)}..."\nResponse: "${asstMsgs[0].text.slice(0, 120)}..."`
+          : result.capsule.summary || capsule.summary;
 
       const structured = buildStructuredContext(updatedMessages, {
         sourcePlatform: (capsule.platform || "other").toUpperCase(),
         title: capsule.title,
-        summary: result.capsule.summary,
+        summary: updatedSummary,
         includeHandoff: true
       });
 
@@ -383,13 +394,13 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
         ...capsule,
         messages: updatedMessages,
         content: structured.optimized || capsule.content,
-        summary: result.capsule.summary || capsule.summary,
+        summary: updatedSummary,
         updatedAt: new Date().toISOString()
       };
 
       if (onUpdateCapsule) {
         await onUpdateCapsule(updatedCapsule);
-        onShowToast("Synced AI response into this capsule!", "success");
+        onShowToast("Synced AI response into this capsule! ✨", "success");
       }
     } catch (err: any) {
       onShowToast(err.message || "Failed to sync AI response", "error");

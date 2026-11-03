@@ -14,7 +14,8 @@ function extractTextFromNode(el: HTMLElement): string {
 
   // Strip UI artifacts: copy buttons, read aloud, feedback thumbs, screen reader prefixes
   text = text
-    .replace(/(?:Copy code|Copied!|Read aloud|Good response|Bad response|Was this response better or worse\?)\s*$/gi, "")
+    .replace(/(?:Copy code|Copied!|Read aloud|Good response|Bad response|Was this response better or worse\?|Was this response helpful\?)\s*$/gi, "")
+    .replace(/(?:Copy|Read aloud|Search|Canvas|Reason|Share)\s*$/gi, "")
     .replace(/^(?:You said|ChatGPT said|User|Assistant):\s*/gi, "")
     .trim();
 
@@ -28,51 +29,94 @@ function extractTextFromNode(el: HTMLElement): string {
 export function extractChatGPTChat(): Partial<Capsule> {
   const messages: CapsuleMessage[] = [];
 
-  // Method 1: Inspect Conversation Turn Containers (article, [data-testid^='conversation-turn-'])
-  // Modern ChatGPT groups exchanges inside conversation turn wrappers.
-  const turnContainers = Array.from(
-    document.querySelectorAll<HTMLElement>(
-      "[data-testid^='conversation-turn-'], article, div[class*='conversation-turn']"
+  // Helper: check if ChatGPT is actively generating or streaming
+  const isGenerating = Boolean(
+    document.querySelector(
+      "button[data-testid='stop-button'], button[aria-label*='Stop'], button[aria-label*='stop'], button[data-testid*='stop'], .result-streaming, [data-is-streaming='true'], [class*='streaming'], form button svg rect"
     )
   );
 
+  // Strategy 1: Top-Level Turn Containers
+  // Distinct queries to avoid parent-child duplicate selection (e.g. article inside conversation-turn-X)
+  let turnContainers = Array.from(
+    document.querySelectorAll<HTMLElement>("[data-testid^='conversation-turn-']")
+  );
+
+  if (turnContainers.length === 0) {
+    turnContainers = Array.from(
+      document.querySelectorAll<HTMLElement>("main article, [role='presentation'] article, article")
+    );
+  }
+
+  if (turnContainers.length === 0) {
+    turnContainers = Array.from(
+      document.querySelectorAll<HTMLElement>("div[class*='conversation-turn']")
+    );
+  }
+
   if (turnContainers.length > 0) {
-    turnContainers.forEach((container) => {
-      // Find User prompt node inside this container
-      const userNode = container.querySelector<HTMLElement>(
-        ".whitespace-pre-wrap, [data-message-author-role='user'], [data-testid*='user']"
+    turnContainers.forEach((container, idx) => {
+      // 1A: Check for dual-turn container (holding both a user prompt and assistant response)
+      const userSub = container.querySelector<HTMLElement>(
+        "[data-message-author-role='user'], [data-message-role='user']"
+      );
+      const asstSub = container.querySelector<HTMLElement>(
+        "[data-message-author-role='assistant'], [data-message-role='assistant'], .markdown, .prose, [class*='markdown'], [class*='prose'], div.text-message, [class*='agent-turn']"
       );
 
-      // Find Assistant response node inside this container
-      const assistantNode = container.querySelector<HTMLElement>(
-        ".markdown, .prose, .result-streaming, [data-message-author-role='assistant'], [data-message-model-slug], div[class*='agent-turn']"
+      if (userSub && asstSub) {
+        const uTarget = userSub.querySelector<HTMLElement>(".whitespace-pre-wrap") || userSub;
+        const uText = extractTextFromNode(uTarget);
+        if (uText) messages.push({ role: "user", text: uText });
+
+        const aTarget =
+          asstSub.querySelector<HTMLElement>(".markdown, .prose, [class*='markdown'], [class*='prose'], div.text-message") ||
+          asstSub;
+        const aText = extractTextFromNode(aTarget);
+        if (aText) messages.push({ role: "assistant", text: aText });
+        return;
+      }
+
+      // 1B: Explicit Role Detection
+      const isUser = Boolean(
+        container.getAttribute("data-message-author-role") === "user" ||
+        container.getAttribute("data-message-role") === "user" ||
+        container.querySelector("[data-message-author-role='user'], [data-message-role='user']") ||
+        container.querySelector("button[aria-label*='Edit'], [data-testid*='edit-message']")
       );
 
-      // If container holds both user prompt and assistant response, extract BOTH in order
-      if (userNode && assistantNode) {
-        const uText = extractTextFromNode(userNode);
-        if (uText) messages.push({ role: "user", text: uText });
+      const isAssistant = Boolean(
+        container.getAttribute("data-message-author-role") === "assistant" ||
+        container.getAttribute("data-message-role") === "assistant" ||
+        container.querySelector("[data-message-author-role='assistant'], [data-message-role='assistant']") ||
+        container.querySelector(".markdown, .prose, [class*='markdown'], [class*='prose'], div.text-message") ||
+        container.querySelector("button[aria-label*='Read aloud'], [data-testid*='copy-turn-action'], button[aria-label*='Good response']")
+      );
 
-        const aText = extractTextFromNode(assistantNode);
-        if (aText) messages.push({ role: "assistant", text: aText });
-      } else if (userNode) {
-        const uText = extractTextFromNode(userNode);
-        if (uText) messages.push({ role: "user", text: uText });
-      } else if (assistantNode) {
-        const aText = extractTextFromNode(assistantNode);
-        if (aText) messages.push({ role: "assistant", text: aText });
+      if (isUser && !isAssistant) {
+        const target =
+          container.querySelector<HTMLElement>(".whitespace-pre-wrap, [data-message-author-role='user'], [class*='whitespace']") ||
+          container;
+        const text = extractTextFromNode(target);
+        if (text) messages.push({ role: "user", text });
+      } else if (isAssistant) {
+        const target =
+          container.querySelector<HTMLElement>(
+            ".markdown, .prose, [class*='markdown'], [class*='prose'], div.text-message, [data-message-author-role='assistant']"
+          ) || container;
+        const text = extractTextFromNode(target);
+        if (text) messages.push({ role: "assistant", text });
       } else {
-        // Fallback for container without explicit classes: check role or content
-        const roleAttr = container.getAttribute("data-message-author-role");
-        const role: "user" | "assistant" = roleAttr === "user" ? "user" : "assistant";
+        // Alternating fallback for containers without explicit classes (e.g. unauth/temporary)
+        const role: "user" | "assistant" = idx % 2 === 0 ? "user" : "assistant";
         const text = extractTextFromNode(container);
         if (text) messages.push({ role, text });
       }
     });
   }
 
-  // Method 2: Standard [data-message-author-role] query across the entire page
-  // Essential if Method 1 found no messages or missed assistant responses
+  // Strategy 2: Page-wide [data-message-author-role] chronological scan
+  // Triggers if Strategy 1 found no messages or missed assistant responses
   if (messages.length === 0 || !messages.some((m) => m.role === "assistant")) {
     const roleNodes = Array.from(document.querySelectorAll<HTMLElement>("[data-message-author-role]"));
     if (roleNodes.length > 0) {
@@ -81,13 +125,12 @@ export function extractChatGPTChat(): Partial<Capsule> {
         const roleAttr = node.getAttribute("data-message-author-role");
         const role: "user" | "assistant" = roleAttr === "user" ? "user" : "assistant";
 
-        // For assistant, prefer inner markdown content to avoid buttons
-        const contentEl =
+        const target =
           role === "assistant"
-            ? (node.querySelector<HTMLElement>(".markdown, .prose") || node)
-            : (node.querySelector<HTMLElement>(".whitespace-pre-wrap") || node);
+            ? (node.querySelector<HTMLElement>(".markdown, .prose, [class*='markdown'], [class*='prose'], div.text-message") || node)
+            : (node.querySelector<HTMLElement>(".whitespace-pre-wrap, [class*='whitespace']") || node);
 
-        const text = extractTextFromNode(contentEl);
+        const text = extractTextFromNode(target);
         if (text) {
           roleMessages.push({ role, text });
         }
@@ -100,59 +143,32 @@ export function extractChatGPTChat(): Partial<Capsule> {
     }
   }
 
-  // Method 3: Chronological Element Pairing via W3C compareDocumentPosition
-  // Queries all user bubbles (.whitespace-pre-wrap) and all assistant response blocks (.markdown, .prose)
-  if (messages.length === 0 || !messages.some((m) => m.role === "assistant")) {
-    const userNodes = Array.from(document.querySelectorAll<HTMLElement>(".whitespace-pre-wrap"));
-    const assistantNodes = Array.from(
-      document.querySelectorAll<HTMLElement>(".markdown, .prose, .result-streaming, div[class*='agent-turn']")
+  // Strategy 3: Active Generation / Streaming Capture ("while running")
+  // If ChatGPT is actively generating or assistant was not finalized, capture live response from the latest turn
+  if (isGenerating || !messages.some((m) => m.role === "assistant")) {
+    const allTurns = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        "[data-testid^='conversation-turn-'], main article, [role='presentation'] article, article"
+      )
     );
+    const lastTurn = allTurns.length > 0 ? allTurns[allTurns.length - 1] : null;
 
-    if (userNodes.length > 0 || assistantNodes.length > 0) {
-      const combined: Array<{ role: "user" | "assistant"; el: HTMLElement }> = [
-        ...userNodes.map((el) => ({ role: "user" as const, el })),
-        ...assistantNodes.map((el) => ({ role: "assistant" as const, el }))
-      ];
+    if (lastTurn) {
+      const liveTarget =
+        lastTurn.querySelector<HTMLElement>(
+          ".result-streaming, [data-is-streaming='true'], [class*='streaming'], .markdown, .prose, [class*='markdown'], [class*='prose'], div.text-message, [data-message-author-role='assistant']"
+        ) || lastTurn;
+      const liveText = extractTextFromNode(liveTarget);
 
-      // Sort in exact document tree order from top to bottom
-      combined.sort((a, b) => {
-        if (a.el === b.el) return 0;
-        const pos = a.el.compareDocumentPosition(b.el);
-        if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-        if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
-        return 0;
-      });
-
-      const paired: CapsuleMessage[] = [];
-      combined.forEach((item) => {
-        const text = extractTextFromNode(item.el);
-        if (text) {
-          paired.push({ role: item.role, text });
+      // Verify that liveText is not identical to the last user prompt
+      const lastUser = messages.filter((m) => m.role === "user").pop();
+      if (liveText && (!lastUser || liveText !== lastUser.text)) {
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && lastMsg.role === "assistant") {
+          lastMsg.text = liveText;
+        } else {
+          messages.push({ role: "assistant", text: liveText });
         }
-      });
-
-      if (paired.length > messages.length || paired.some((m) => m.role === "assistant")) {
-        messages.length = 0;
-        messages.push(...paired);
-      }
-    }
-  }
-
-  // Method 4: Live Streaming Check ("while running")
-  // If ChatGPT is actively generating and the assistant response has not finalized, grab the active stream
-  const isStreaming = Boolean(
-    document.querySelector(
-      "button[aria-label*='Stop'], button[data-testid*='stop'], .result-streaming, [data-is-streaming='true']"
-    )
-  );
-  if (isStreaming && !messages.some((m) => m.role === "assistant")) {
-    const streamTarget = document.querySelector<HTMLElement>(
-      ".result-streaming, [data-is-streaming='true'], div[class*='streaming'], .markdown:last-of-type"
-    );
-    if (streamTarget) {
-      const liveText = extractTextFromNode(streamTarget);
-      if (liveText) {
-        messages.push({ role: "assistant", text: liveText });
       }
     }
   }
@@ -183,7 +199,7 @@ export function extractChatGPTChat(): Partial<Capsule> {
 
   let summary = "";
   if (userMessages.length > 0 && assistantMessages.length > 0) {
-    summary = `Prompt: "${userMessages[0].text.slice(0, 75)}..."\nResponse: "${assistantMessages[0].text.slice(0, 100)}..."`;
+    summary = `Prompt: "${userMessages[0].text.slice(0, 80)}..."\nResponse: "${assistantMessages[0].text.slice(0, 120)}..."`;
   } else if (userMessages.length > 0) {
     summary = `Prompt: "${userMessages[0].text.slice(0, 120)}..."`;
   } else if (assistantMessages.length > 0) {
