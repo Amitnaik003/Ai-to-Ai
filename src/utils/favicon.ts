@@ -12,19 +12,9 @@ export function setSidepanelFavicon() {
   if (!link) {
     link = document.createElement("link");
     link.rel = "icon";
-    link.type = "image/png";
     document.head.appendChild(link);
   }
 
-  try {
-    if (typeof chrome !== "undefined" && chrome.runtime?.getURL) {
-      link.href = chrome.runtime.getURL("icon32.plasmo.png");
-    } else {
-      link.type = "image/svg+xml";
-      link.href = FAVICON_SVG_DATA_URI;
-    }
-  } catch {
-    link.type = "image/svg+xml";
-    link.href = FAVICON_SVG_DATA_URI;
-  }
+  link.type = "image/svg+xml";
+  link.href = FAVICON_SVG_DATA_URI;
 }
