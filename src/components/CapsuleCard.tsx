@@ -490,11 +490,11 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
           {capsule.title}
         </h2>
 
-        {/* Summary */}
+        {/* Summary / Prompt & Response Snippet */}
         {capsule.summary && (
-          <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5 leading-relaxed">
+          <div className="mt-1.5 p-2 rounded-lg bg-slate-50/80 border border-slate-200/60 text-[11px] text-slate-600 leading-relaxed font-sans whitespace-pre-line line-clamp-3">
             {capsule.summary}
-          </p>
+          </div>
         )}
 
         {/* Tags */}
@@ -553,9 +553,35 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
             </span>
           </div>
 
-          <pre className="p-2 bg-white rounded-lg border border-slate-200 text-[10px] text-slate-700 font-mono whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
-            {activePayload}
-          </pre>
+          {/* Dialogue Turns Preview */}
+          {capsule.messages && capsule.messages.length > 0 ? (
+            <div className="space-y-2 max-h-60 overflow-y-auto p-1.5 bg-white rounded-lg border border-slate-200">
+              {capsule.messages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`p-2 rounded-lg text-[11px] leading-relaxed ${
+                    msg.role === "user"
+                      ? "bg-indigo-50/70 border border-indigo-100 text-slate-800"
+                      : msg.role === "system"
+                      ? "bg-amber-50/70 border border-amber-100 text-slate-800"
+                      : "bg-slate-50 border border-slate-200/80 text-slate-800"
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-[10px] font-bold mb-1">
+                    <span className={msg.role === "user" ? "text-indigo-600" : msg.role === "system" ? "text-amber-600" : "text-emerald-700"}>
+                      {msg.role === "user" ? "👤 User (Prompt)" : msg.role === "system" ? "⚙️ System Directive" : "🤖 Assistant (Response)"}
+                    </span>
+                    <span className="text-slate-400 font-normal">Turn {idx + 1}</span>
+                  </div>
+                  <div className="whitespace-pre-wrap font-sans text-[11px]">{msg.text}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <pre className="p-2 bg-white rounded-lg border border-slate-200 text-[10px] text-slate-700 font-mono whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+              {activePayload}
+            </pre>
+          )}
         </div>
       )}
 
