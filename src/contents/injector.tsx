@@ -12,6 +12,8 @@ export const config: PlasmoCSConfig = {
   matches: [
     "https://chatgpt.com/*",
     "https://*.chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://*.openai.com/*",
     "https://claude.ai/*",
     "https://gemini.google.com/*",
     "https://perplexity.ai/*",

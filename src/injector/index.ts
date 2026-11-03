@@ -5,11 +5,16 @@
 export function findActivePromptInput(): HTMLElement | null {
   function searchRoot(root: Document | ShadowRoot): HTMLElement | null {
     const selectors = [
-      // ChatGPT (Lexical & Textarea)
+      // ChatGPT (Lexical, ProseMirror, Textarea, and Canvas/New UI)
       "#prompt-textarea",
       "div#prompt-textarea[contenteditable='true']",
-      "div[data-placeholder][contenteditable='true']",
+      "div#prompt-textarea",
+      "div[data-testid='prompt-textarea']",
+      "textarea[data-testid='prompt-textarea']",
+      "textarea#prompt-textarea",
       "div[contenteditable='true'][id='prompt-textarea']",
+      "div[contenteditable='true'][data-placeholder]",
+      "div[role='textbox'][contenteditable='true']",
 
       // Claude (ProseMirror)
       "div.ProseMirror[contenteditable='true']",
@@ -38,6 +43,7 @@ export function findActivePromptInput(): HTMLElement | null {
       "div[role='textbox'][g_editable='true']",
 
       // Generic LLM & Web App fallbacks
+      "form textarea",
       "textarea[placeholder*='Message']",
       "textarea[placeholder*='Ask']",
       "textarea[placeholder*='prompt']",
@@ -92,66 +98,100 @@ export function injectTextIntoElement(target: HTMLElement, text: string): boolea
 
     // Strategy 1: Rich Text / ContentEditable (ChatGPT Lexical, Claude ProseMirror, Gemini Quill)
     if (target.isContentEditable || target.getAttribute("contenteditable") === "true") {
+      // Target paragraph or child editable node if present (standard in Lexical/ChatGPT)
+      const innerP = target.querySelector<HTMLElement>("p");
+      const editTarget = innerP || target;
+
+      // Position caret at end of current content
       const selection = window.getSelection();
       const range = document.createRange();
-      range.selectNodeContents(target);
-      range.collapse(false); // caret at end of current content
+      range.selectNodeContents(editTarget);
+      range.collapse(false);
       selection?.removeAllRanges();
       selection?.addRange(range);
 
-      let success = false;
+      let injected = false;
+
+      // 1A: Primary method for Lexical & ProseMirror - Synthetic ClipboardEvent paste
+      // Lexical's PASTE_COMMAND processes multi-line text, removes placeholder, and syncs EditorState
       try {
-        success = document.execCommand("insertText", false, text);
+        const dt = new DataTransfer();
+        dt.setData("text/plain", text);
+        const pasteEvent = new ClipboardEvent("paste", {
+          clipboardData: dt,
+          bubbles: true,
+          cancelable: true
+        });
+        target.dispatchEvent(pasteEvent);
+        if (target.innerText && target.innerText.includes(text.slice(0, 10))) {
+          injected = true;
+        }
       } catch {
-        success = false;
+        injected = false;
       }
 
-      if (!success || !target.innerText.includes(text.slice(0, 10))) {
-        // Fallback 1A: Dispatch synthetic ClipboardEvent paste (supported by Lexical & ProseMirror)
+      // 1B: Synthetic BeforeInput with insertFromPaste / insertText
+      if (!injected) {
         try {
           const dt = new DataTransfer();
           dt.setData("text/plain", text);
-          const pasteEvent = new ClipboardEvent("paste", {
-            clipboardData: dt,
-            bubbles: true,
-            cancelable: true
-          });
-          target.dispatchEvent(pasteEvent);
-        } catch {}
-
-        // Fallback 1B: Dispatch synthetic BeforeInput
-        try {
           const beforeInputEvent = new InputEvent("beforeinput", {
             bubbles: true,
             cancelable: true,
-            inputType: "insertText",
-            data: text
+            inputType: "insertFromPaste",
+            data: text,
+            dataTransfer: dt
           });
           target.dispatchEvent(beforeInputEvent);
+          if (target.innerText && target.innerText.includes(text.slice(0, 10))) {
+            injected = true;
+          }
         } catch {}
-
-        if (!target.innerText.includes(text.slice(0, 10))) {
-          // Fallback 1C: Insert paragraphs / text node directly with line break preservation
-          const lines = text.split("\n");
-          const fragment = document.createDocumentFragment();
-          lines.forEach((line, idx) => {
-            if (idx > 0) {
-              fragment.appendChild(document.createElement("br"));
-            }
-            if (line) {
-              fragment.appendChild(document.createTextNode(line));
-            }
-          });
-          range.insertNode(fragment);
-          range.collapse(false);
-          selection?.removeAllRanges();
-          selection?.addRange(range);
-        }
       }
 
-      // Notify modern framework state trackers
+      // 1C: document.execCommand('insertText')
+      if (!injected) {
+        try {
+          const execOk = document.execCommand("insertText", false, text);
+          if (execOk && target.innerText && target.innerText.includes(text.slice(0, 10))) {
+            injected = true;
+          }
+        } catch {}
+      }
+
+      // 1D: Direct DOM fragment insertion fallback with line break preservation
+      if (!injected && (!target.innerText || !target.innerText.includes(text.slice(0, 10)))) {
+        const lines = text.split("\n");
+        const fragment = document.createDocumentFragment();
+        lines.forEach((line, idx) => {
+          if (idx > 0) {
+            fragment.appendChild(document.createElement("br"));
+          }
+          if (line) {
+            fragment.appendChild(document.createTextNode(line));
+          }
+        });
+        range.insertNode(fragment);
+        range.collapse(false);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      }
+
+      // Notify modern framework state trackers (React, Lexical, Vue)
       target.dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
       target.dispatchEvent(new Event("change", { bubbles: true }));
+      target.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: text }));
+
+      // Special unlock for ChatGPT Send Button
+      const chatgptSendButton = document.querySelector<HTMLButtonElement>(
+        "button[data-testid='send-button'], button[aria-label*='Send prompt'], button[aria-label*='Send message']"
+      );
+      if (chatgptSendButton) {
+        chatgptSendButton.removeAttribute("disabled");
+        chatgptSendButton.disabled = false;
+        chatgptSendButton.setAttribute("aria-disabled", "false");
+      }
+
       return true;
     }
 
@@ -181,6 +221,16 @@ export function injectTextIntoElement(target: HTMLElement, text: string): boolea
       target.dispatchEvent(new Event("change", { bubbles: true }));
       target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: " " }));
       target.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true, key: " " }));
+
+      // Also ensure send button on textarea forms is enabled
+      const sendButton = target.form?.querySelector<HTMLButtonElement>(
+        "button[data-testid='send-button'], button[type='submit']"
+      );
+      if (sendButton) {
+        sendButton.removeAttribute("disabled");
+        sendButton.disabled = false;
+      }
+
       return true;
     }
 

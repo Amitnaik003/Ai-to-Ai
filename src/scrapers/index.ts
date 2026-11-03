@@ -8,7 +8,7 @@ import type { Capsule, PlatformType } from "../types";
 
 export function detectCurrentPlatform(): PlatformType {
   const host = window.location.hostname;
-  if (host.includes("chatgpt.com")) return "chatgpt";
+  if (host.includes("chatgpt.com") || host.includes("openai.com")) return "chatgpt";
   if (host.includes("claude.ai")) return "claude";
   if (host.includes("gemini.google.com")) return "gemini";
   if (host.includes("perplexity.ai")) return "perplexity";

@@ -1,5 +1,7 @@
 /**
  * Sends a message to the currently active tab in the current window.
+ * If the content script is not yet injected (e.g. tab was opened before extension was loaded/reloaded),
+ * automatically attempts programmatic injection via chrome.scripting.executeScript.
  */
 export async function sendMessageToActiveTab(message: any): Promise<{ success: boolean; response?: any; error?: string }> {
   try {
@@ -12,12 +14,51 @@ export async function sendMessageToActiveTab(message: any): Promise<{ success: b
       return { success: false, error: "No active tab found." };
     }
 
+    const tabId = activeTab.id;
+
     return new Promise((resolve) => {
-      chrome.tabs.sendMessage(activeTab.id!, message, (response) => {
+      chrome.tabs.sendMessage(tabId, message, async (response) => {
         if (chrome.runtime.lastError) {
+          const errMsg = chrome.runtime.lastError.message || "";
+
+          // Check if failure is due to missing content script in already-opened tab
+          if (
+            errMsg.includes("Receiving end does not exist") ||
+            errMsg.includes("Could not establish connection")
+          ) {
+            try {
+              const manifest = chrome.runtime.getManifest();
+              const scriptFiles = manifest.content_scripts?.[0]?.js;
+              if (scriptFiles && scriptFiles.length > 0 && chrome.scripting?.executeScript) {
+                await chrome.scripting.executeScript({
+                  target: { tabId },
+                  files: scriptFiles
+                });
+
+                // Short delay for message listeners to register
+                await new Promise((r) => setTimeout(r, 200));
+
+                // Retry dispatching the message
+                chrome.tabs.sendMessage(tabId, message, (retryResponse) => {
+                  if (chrome.runtime.lastError) {
+                    resolve({
+                      success: false,
+                      error: "Could not establish connection. Please refresh the page once."
+                    });
+                  } else {
+                    resolve({ success: true, response: retryResponse });
+                  }
+                });
+                return;
+              }
+            } catch (injectErr: any) {
+              // Fall through to original error report
+            }
+          }
+
           resolve({
             success: false,
-            error: chrome.runtime.lastError.message || "Failed to communicate with tab."
+            error: errMsg || "Failed to communicate with tab."
           });
         } else {
           resolve({ success: true, response });
@@ -39,7 +80,6 @@ export async function injectCapsuleIntoActiveTab(text: string): Promise<{ succes
   });
 
   if (!result.success) {
-    // If content script is not yet injected or user is on non-target page
     return {
       success: false,
       error: result.error?.includes("Receiving end does not exist")
@@ -66,7 +106,7 @@ export async function triggerActiveTabCapture(): Promise<{ success: boolean; cap
   if (!result.success) {
     return {
       success: false,
-      error: "Active tab does not support automated chat capture or needs to be refreshed."
+      error: result.error || "Active tab does not support automated chat capture or needs to be refreshed."
     };
   }
 
