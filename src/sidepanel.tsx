@@ -228,7 +228,8 @@ export default function SidePanel() {
           updatedAt: new Date().toISOString()
         };
         const saved = await saveCapsule(newCap);
-        showToast(`Captured: "${saved.title.slice(0, 24)}"`, "success");
+        const turnCount = saved.messages?.length || 1;
+        showToast(`Captured ${turnCount} msg${turnCount === 1 ? "" : "s"}: "${saved.title.slice(0, 20)}"`, "success");
       } else {
         showToast(result.error || "Unable to extract chat context", "error");
       }

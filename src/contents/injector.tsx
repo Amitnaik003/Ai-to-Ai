@@ -148,7 +148,8 @@ export default function FloatingCapsuleWidget() {
         updatedAt: new Date().toISOString()
       });
 
-      setStatus("Saved Structured Capsule!");
+      const turnCount = saved.messages?.length || 1;
+      setStatus(`Saved ${turnCount} msg${turnCount === 1 ? "" : "s"}!`);
       setTimeout(() => {
         setStatus(null);
         setIsOpen(false);
