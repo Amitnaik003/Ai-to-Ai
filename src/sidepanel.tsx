@@ -229,7 +229,9 @@ export default function SidePanel() {
         };
         const saved = await saveCapsule(newCap);
         const turnCount = saved.messages?.length || 1;
-        showToast(`Captured ${turnCount} msg${turnCount === 1 ? "" : "s"}: "${saved.title.slice(0, 20)}"`, "success");
+        const uCount = saved.messages?.filter((m) => m.role === "user").length || 0;
+        const aCount = saved.messages?.filter((m) => m.role === "assistant").length || 0;
+        showToast(uCount > 0 && aCount > 0 ? `Captured ${saved.messages?.length} msgs (${uCount} User · ${aCount} AI)` : `Captured ${turnCount} msg(s)`, "success");
       } else {
         showToast(result.error || "Unable to extract chat context", "error");
       }
