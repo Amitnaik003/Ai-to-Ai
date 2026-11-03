@@ -22,8 +22,8 @@ import {
   FileCode,
   Sparkles
 } from "lucide-react";
-import type { Capsule, PlatformType } from "../types";
-import { injectCapsuleIntoActiveTab } from "../utils/activeTab";
+import type { Capsule, CapsuleMessage, PlatformType } from "../types";
+import { injectCapsuleIntoActiveTab, triggerActiveTabCapture } from "../utils/activeTab";
 import { buildStructuredContext, getConversationStats } from "../utils/contextFormatter";
 import { scanSecurity, redactSensitiveData } from "../utils/securityScanner";
 import {
@@ -350,6 +350,52 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
     }
   };
 
+  // Sync latest AI response from active tab into this capsule
+  const handleSyncResponse = async () => {
+    try {
+      const result = await triggerActiveTabCapture();
+      if (!result.success || !result.capsule) {
+        onShowToast(result.error || "Could not read active chat. Open ChatGPT tab first.", "error");
+        return;
+      }
+
+      const extractedMessages = result.capsule.messages || [];
+      const assistantMsg = extractedMessages.find((m: any) => m.role === "assistant");
+      if (!assistantMsg) {
+        onShowToast("No AI response found on active tab yet. Wait for ChatGPT to finish!", "info");
+        return;
+      }
+
+      const existingUserTurns = (capsule.messages || []).filter((m) => m.role === "user");
+      const updatedMessages: CapsuleMessage[] =
+        existingUserTurns.length > 0
+          ? [...existingUserTurns, assistantMsg]
+          : extractedMessages;
+
+      const structured = buildStructuredContext(updatedMessages, {
+        sourcePlatform: (capsule.platform || "other").toUpperCase(),
+        title: capsule.title,
+        summary: result.capsule.summary,
+        includeHandoff: true
+      });
+
+      const updatedCapsule: Capsule = {
+        ...capsule,
+        messages: updatedMessages,
+        content: structured.optimized || capsule.content,
+        summary: result.capsule.summary || capsule.summary,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (onUpdateCapsule) {
+        await onUpdateCapsule(updatedCapsule);
+        onShowToast("Synced AI response into this capsule!", "success");
+      }
+    } catch (err: any) {
+      onShowToast(err.message || "Failed to sync AI response", "error");
+    }
+  };
+
   // HTML5 Drag and Drop context transfer
   const handleDragStart = (e: React.DragEvent) => {
     if (isBatchMode) {
@@ -627,6 +673,18 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
               </>
             )}
           </button>
+
+          {/* If single prompt without response, offer Sync Reply button */}
+          {stats.assistantMessages === 0 && (
+            <button
+              onClick={handleSyncResponse}
+              title="Capture AI response from active ChatGPT tab and attach to this capsule"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition cursor-pointer"
+            >
+              <Sparkles className="w-3 h-3 text-emerald-600" />
+              <span>Sync Reply</span>
+            </button>
+          )}
 
           {/* Inject Button */}
           <button

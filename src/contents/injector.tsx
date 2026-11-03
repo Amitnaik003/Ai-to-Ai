@@ -149,7 +149,9 @@ export default function FloatingCapsuleWidget() {
       });
 
       const turnCount = saved.messages?.length || 1;
-      setStatus(`Saved ${turnCount} msg${turnCount === 1 ? "" : "s"}!`);
+      const userCount = saved.messages?.filter((m) => m.role === "user").length || 0;
+      const aiCount = saved.messages?.filter((m) => m.role === "assistant").length || 0;
+      setStatus(userCount > 0 && aiCount > 0 ? `Saved ${saved.messages?.length} msgs (${userCount} User · ${aiCount} AI)!` : `Saved ${turnCount} msg(s)!`);
       setTimeout(() => {
         setStatus(null);
         setIsOpen(false);
