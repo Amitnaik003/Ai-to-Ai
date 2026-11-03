@@ -242,7 +242,7 @@ export const CapsuleEditorModal: React.FC<CapsuleEditorModalProps> = ({
                 Prompt / Conversation Content *
               </label>
 
-              {/* Turn count & word metrics (No tokens!) */}
+              {/* Turn count and word metrics */}
               <div className="flex items-center gap-2 text-[10px] text-slate-500">
                 <span className="inline-flex items-center gap-1 font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
                   <MessageSquare className="w-2.5 h-2.5" />

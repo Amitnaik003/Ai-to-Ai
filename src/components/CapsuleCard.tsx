@@ -433,7 +433,7 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
               <span>{stats.label}</span>
             </span>
 
-            {/* Reading Time / Words metric (Zero tokens!) */}
+            {/* Reading Time and Word Count metrics */}
             {stats.wordCount > 0 && (
               <span
                 title={`${stats.wordCount.toLocaleString()} words · ~${stats.readingTimeMin} min read time`}
